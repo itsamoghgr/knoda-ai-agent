@@ -1,0 +1,50 @@
+version: "3.9"
+
+# Production Docker Compose — API + Nginx only.
+# PostgreSQL is provided by Supabase (no local DB container).
+#
+# Prerequisites:
+#   - Copy docker/.env.prod.example to docker/.env.prod and fill in values
+#   - Ensure your Supabase project has the pgvector extension enabled
+#   - Point DATABASE_URL to Supabase's PgBouncer pooled connection (port 6543)
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      ALEMBIC_DATABASE_URL: ${ALEMBIC_DATABASE_URL}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      API_HOST: "0.0.0.0"
+      API_PORT: "8000"
+      MAX_ROWS_PER_QUERY: ${MAX_ROWS_PER_QUERY:-1000}
+      QUERY_TIMEOUT_SECONDS: ${QUERY_TIMEOUT_SECONDS:-30}
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+    depends_on:
+      - api

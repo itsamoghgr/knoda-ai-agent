@@ -1,0 +1,87 @@
+name: knoda-backend
+region: nyc
+
+services:
+  - name: api
+    github:
+      repo: itsamoghgr/db-discovery-agent
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: docker/Dockerfile.backend
+    http_port: 8000
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-2gb   # 2 GB RAM — required for LangGraph agents
+
+    # Health check — DO will restart the container if this fails
+    health_check:
+      http_path: /api/v1/health
+      initial_delay_seconds: 30
+      period_seconds: 30
+      timeout_seconds: 10
+      failure_threshold: 3
+
+    routes:
+      - path: /
+
+    envs:
+      # ── Database (Supabase pooler) ────────────────────────────────────────────
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+
+      - key: ALEMBIC_DATABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+
+      # ── Supabase Auth ─────────────────────────────────────────────────────────
+      - key: SUPABASE_URL
+        scope: RUN_TIME
+        type: SECRET
+
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        scope: RUN_TIME
+        type: SECRET
+
+      # ── LLM fallback (users set their own keys via the Settings UI) ───────────
+      - key: LLM_PROVIDER
+        scope: RUN_TIME
+        value: openai
+
+      - key: LLM_MODEL
+        scope: RUN_TIME
+        value: gpt-4o
+
+      - key: LLM_API_KEY
+        scope: RUN_TIME
+        value: ""
+
+      # ── CORS — set to your Vercel URL ─────────────────────────────────────────
+      - key: CORS_ORIGINS
+        scope: RUN_TIME
+        value: '["https://your-app.vercel.app"]'
+
+      # ── Safety limits ─────────────────────────────────────────────────────────
+      - key: MAX_ROWS_PER_QUERY
+        scope: RUN_TIME
+        value: "1000"
+
+      - key: QUERY_TIMEOUT_SECONDS
+        scope: RUN_TIME
+        value: "30"
+
+      - key: MAX_SAMPLE_ROWS
+        scope: RUN_TIME
+        value: "10"
+
+      - key: MAX_CONCURRENT_TABLE_TASKS
+        scope: RUN_TIME
+        value: "10"
+
+      # ── Server ────────────────────────────────────────────────────────────────
+      - key: API_HOST
+        scope: RUN_TIME
+        value: "0.0.0.0"
+
+      - key: API_PORT
+        scope: RUN_TIME
+        value: "8000"

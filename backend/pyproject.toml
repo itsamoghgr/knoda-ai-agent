@@ -1,0 +1,121 @@
+[project]
+name = "knoda-ai"
+version = "0.1.0"
+description = "LLM-powered database discovery agent that generates dbt-compatible semantic layers"
+readme = "../README.md"
+license = { file = "../LICENSE" }
+requires-python = ">=3.12"
+authors = [{ name = "DB Discovery Agent Contributors" }]
+keywords = ["database", "discovery", "semantic-layer", "dbt", "llm", "agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    # API server
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    # PostgreSQL operational store
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    # DuckDB analytical engine
+    "duckdb>=1.2",
+    # LangGraph agent orchestration
+    "langgraph>=0.3",
+    "langchain-core>=0.3",
+    "langchain-openai>=0.3",
+    "langchain-anthropic>=0.3",
+    "langchain-groq>=0.2",
+    "langgraph-checkpoint-postgres>=2.0",
+    # Data models + config
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    # SQL dialect normalization + validation
+    "sqlglot>=25",
+    # FK name similarity detection
+    "rapidfuzz>=3.0",
+    # YAML serialization
+    "pyyaml>=6.0",
+    # Async HTTP client
+    "httpx>=0.28",
+    # SSE streaming
+    "sse-starlette>=2.1",
+    "pandas>=3.0.1",
+    # Vector embeddings
+    "openai>=1.0",
+    "pgvector>=0.3",
+    # Supabase client — auth token verification + future DB/storage access
+    "supabase>=2.0",
+    # Rate limiting
+    "slowapi>=0.1.9",
+    # Redis — snapshot cache + presentation session store + short-term memory checkpointer
+    "redis[hiredis]>=5.0",
+    "langgraph-checkpoint-redis>=0.0.1",
+    # Meeting bot — Google Meet via Recall.ai
+    "apscheduler>=3.10",            # in-process async scheduler with PostgreSQL job store
+    "playwright>=1.44",             # headless Chromium for dashboard screensharing
+    "dateparser>=1.2",              # natural language time parsing ("4:30 PM", "tomorrow at 3pm")
+    "psycopg2-binary>=2.9",         # sync PostgreSQL driver required by APScheduler job store
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "httpx>=0.28",
+    "types-pyyaml",
+    "types-sqlalchemy",
+]
+
+[project.urls]
+Homepage = "https://github.com/your-org/db-discovery-agent"
+Repository = "https://github.com/your-org/db-discovery-agent"
+Issues = "https://github.com/your-org/db-discovery-agent/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+sources = ["src"]
+packages = ["src/agents", "src/api", "src/embeddings", "src/meeting", "src/models", "src/query_engine", "src/semantic", "src/storage", "src/tools"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "TCH"]
+ignore = [
+    "E501",
+    "B008",  # FastAPI Depends() in function argument defaults is the standard pattern
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agents", "api", "config", "models", "query_engine", "semantic", "storage", "tools"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+mypy_path = "src"
+explicit_package_bases = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-v"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*"]
