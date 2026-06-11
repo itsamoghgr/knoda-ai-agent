@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Providers } from "@/components/providers";
 import { AppShell } from "@/components/layout/app-shell";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans", weight: ["400", "500", "700"] });
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Toaster richColors position="bottom-right" />
           </TooltipProvider>
         </Providers>
+        <Analytics />
       </body>
     </html>
   );
