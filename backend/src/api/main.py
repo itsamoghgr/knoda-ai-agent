@@ -73,7 +73,7 @@ async def _cleanup_orphaned_meetings() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("Starting Knoda.ai API")
+    logger.info("Starting Knoda AI API")
     await _cleanup_orphaned_meetings()
     cleanup_task = present_router.start_session_cleanup()
     db_url = settings.apscheduler_database_url or settings.database_url
@@ -85,7 +85,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await cleanup_task
     await close_redis()
     await engine.dispose()
-    logger.info("Knoda.ai API stopped")
+    logger.info("Knoda AI API stopped")
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -103,7 +103,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Knoda.ai",
+        title="Knoda AI",
         description="LLM-powered database discovery and semantic layer generation API",
         version="0.1.0",
         lifespan=lifespan,

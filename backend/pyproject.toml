@@ -78,9 +78,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/db-discovery-agent"
-Repository = "https://github.com/your-org/db-discovery-agent"
-Issues = "https://github.com/your-org/db-discovery-agent/issues"
+Homepage = "https://github.com/itsamoghgr/knoda-ai-agent"
+Repository = "https://github.com/itsamoghgr/knoda-ai-agent"
+Issues = "https://github.com/itsamoghgr/knoda-ai-agent/issues"
 
 [build-system]
 requires = ["hatchling"]

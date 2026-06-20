@@ -4,7 +4,7 @@ region: nyc
 services:
   - name: api
     github:
-      repo: itsamoghgr/db-discovery-agent
+      repo: itsamoghgr/knoda-ai-agent
       branch: main
       deploy_on_push: true
     dockerfile_path: docker/Dockerfile.backend
