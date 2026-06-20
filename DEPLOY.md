@@ -1,4 +1,4 @@
-# Luray.ai — Deployment Guide
+# Knoda AI — Deployment Guide
 
 Two backend deployment options are supported. Choose one:
 
@@ -27,7 +27,7 @@ User → Vercel (Next.js frontend)
 
 **2. Create the App**
 - Go to **Apps → Create App**
-- Connect your GitHub account → select `itsamoghgr/luray-ai`
+- Connect your GitHub account → select `itsamoghgr/knoda-ai-agent`
 - Branch: `main` — enable **Autodeploy**
 - DigitalOcean will detect `.do/app.yaml` automatically and pre-fill the config
 
@@ -44,7 +44,7 @@ The `.do/app.yaml` defines all variables. For the ones marked `SECRET`, paste th
 
 Also update `CORS_ORIGINS` to your Vercel URL:
 ```
-["https://db-discovery-agent.vercel.app"]
+["https://knoda-ai-agent.vercel.app"]
 ```
 
 **4. Deploy**
@@ -62,8 +62,8 @@ Then redeploy Vercel.
 **6. Update Supabase Auth**
 
 Supabase dashboard → **Authentication → URL Configuration**:
-- **Site URL**: `https://db-discovery-agent.vercel.app`
-- **Redirect URLs**: `https://db-discovery-agent.vercel.app/auth/callback`
+- **Site URL**: `https://knoda-ai-agent.vercel.app`
+- **Redirect URLs**: `https://knoda-ai-agent.vercel.app/auth/callback`
 
 ### Updating after code changes
 Push to `main` → DigitalOcean auto-deploys. No SSH needed.
@@ -86,10 +86,10 @@ User → Vercel (Next.js frontend)
 
 - AWS account with EC2 access
 - Supabase project set up with pgvector enabled (migrations already run)
-- GitHub repo: `itsamoghgr/luray-ai`
+- GitHub repo: `itsamoghgr/knoda-ai-agent`
 - Vercel account
-- A domain you control — this guide uses `api.luray.ai` for the backend and
-  `https://db-discovery-agent.vercel.app` for the frontend
+- A domain you control — this guide uses `api-knoda.itsamoghgr.com` for the backend and
+  `https://knoda-ai-agent.vercel.app` for the frontend
 
 ---
 
@@ -117,13 +117,13 @@ User → Vercel (Next.js frontend)
 At your DNS provider, add an **A record**:
 
 ```
-api.luray.ai  →  <your EC2 Elastic IP>
+api-knoda.itsamoghgr.com  →  <your EC2 Elastic IP>
 ```
 
 Confirm it resolves before issuing the certificate in Step 7:
 
 ```bash
-dig +short api.luray.ai   # must return your EC2 IP
+dig +short api-knoda.itsamoghgr.com   # must return your EC2 IP
 ```
 
 ---
@@ -156,26 +156,26 @@ docker compose version
 The repo is public, so an HTTPS clone needs no deploy key:
 
 ```bash
-git clone https://github.com/itsamoghgr/luray-ai.git
-cd luray-ai
+git clone https://github.com/itsamoghgr/knoda-ai-agent.git
+cd knoda-ai-agent
 
 # Create the production env file (gitignored — never commit it)
 cp docker/.env.prod.example docker/.env.prod
 nano docker/.env.prod   # fill in your Supabase + LLM values
 ```
 
-Set `CORS_ORIGINS=["https://db-discovery-agent.vercel.app"]` and your real
+Set `CORS_ORIGINS=["https://knoda-ai-agent.vercel.app"]` and your real
 Supabase `DATABASE_URL` / `ALEMBIC_DATABASE_URL` / `SUPABASE_URL` /
 `SUPABASE_SERVICE_ROLE_KEY`.
 
 > **Important:** If your Supabase password contains `$`, escape it as `$$` in the env file
 > (docker compose interpolates the env file).
 
-The shipped `docker/nginx.conf` is already set to `server_name api.luray.ai`. If you
+The shipped `docker/nginx.conf` is already set to `server_name api-knoda.itsamoghgr.com`. If you
 use a different subdomain, update it:
 
 ```bash
-sed -i 's/api\.luray\.ai/api.your-domain.com/g' docker/nginx.conf
+sed -i 's/api\.knoda\.ai/api.your-domain.com/g' docker/nginx.conf
 ```
 
 ---
@@ -188,11 +188,11 @@ already resolve to this box):
 
 ```bash
 sudo apt-get update && sudo apt-get install -y certbot
-sudo certbot certonly --standalone -d api.luray.ai \
+sudo certbot certonly --standalone -d api-knoda.itsamoghgr.com \
   --non-interactive --agree-tos -m itsamoghgr@gmail.com
 ```
 
-Certs are written to `/etc/letsencrypt/live/api.luray.ai/`, which the prod compose
+Certs are written to `/etc/letsencrypt/live/api-knoda.itsamoghgr.com/`, which the prod compose
 file already mounts read-only into the Nginx container.
 
 ---
@@ -209,7 +209,7 @@ slow (it installs Chromium). Verify:
 ```bash
 docker compose -f docker/docker-compose.prod.yml ps
 docker compose -f docker/docker-compose.prod.yml logs api --tail=40
-curl https://api.luray.ai/api/v1/health   # expect {"status":"ok",...}
+curl https://api-knoda.itsamoghgr.com/api/v1/health   # expect {"status":"ok",...}
 ```
 
 ---
@@ -219,14 +219,14 @@ curl https://api.luray.ai/api/v1/health   # expect {"status":"ok",...}
 Let's Encrypt certs expire after 90 days. Reload Nginx automatically on renewal:
 
 ```bash
-echo '0 3 * * * root certbot renew --quiet --deploy-hook "docker compose -f /home/ubuntu/luray-ai/docker/docker-compose.prod.yml restart nginx"' | sudo tee /etc/cron.d/certbot-renew
+echo '0 3 * * * root certbot renew --quiet --deploy-hook "docker compose -f /home/ubuntu/knoda-ai-agent/docker/docker-compose.prod.yml restart nginx"' | sudo tee /etc/cron.d/certbot-renew
 ```
 
 ---
 
 ## Step 9 — Deploy Frontend to Vercel
 
-1. Go to [vercel.com](https://vercel.com) → **Add New Project** → import `itsamoghgr/luray-ai`
+1. Go to [vercel.com](https://vercel.com) → **Add New Project** → import `itsamoghgr/knoda-ai-agent`
 2. Set **Root Directory** to `frontend`
 3. Add **Environment Variables**:
 
@@ -234,7 +234,7 @@ echo '0 3 * * * root certbot renew --quiet --deploy-hook "docker compose -f /hom
 |-----|-------|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://[ref].supabase.co` |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | your anon key |
-| `NEXT_PUBLIC_API_URL` | `https://api.luray.ai/api/v1` |
+| `NEXT_PUBLIC_API_URL` | `https://api-knoda.itsamoghgr.com/api/v1` |
 
 4. Click **Deploy**
 
@@ -243,8 +243,8 @@ echo '0 3 * * * root certbot renew --quiet --deploy-hook "docker compose -f /hom
 ## Step 10 — Update Supabase Auth
 
 In Supabase dashboard → **Authentication → URL Configuration**:
-- **Site URL**: `https://db-discovery-agent.vercel.app`
-- **Redirect URLs**: `https://db-discovery-agent.vercel.app/auth/callback`
+- **Site URL**: `https://knoda-ai-agent.vercel.app`
+- **Redirect URLs**: `https://knoda-ai-agent.vercel.app/auth/callback`
 
 ---
 
@@ -252,7 +252,7 @@ In Supabase dashboard → **Authentication → URL Configuration**:
 
 ```bash
 ssh -i ~/Downloads/your-key.pem ubuntu@YOUR-EC2-IP
-cd luray-ai
+cd knoda-ai-agent
 git pull origin main
 docker compose -f docker/docker-compose.prod.yml --env-file docker/.env.prod up -d --build
 ```

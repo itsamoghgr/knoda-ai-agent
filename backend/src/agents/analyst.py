@@ -36,7 +36,7 @@ from agents.core import (
 
 logger = logging.getLogger(__name__)
 
-ANALYST_PROMPT = """You are an expert data analyst agent for Luray.ai. You have access to a
+ANALYST_PROMPT = """You are an expert data analyst agent for Knoda AI. You have access to a
 pre-built semantic catalog produced by a discovery agent, plus the ability to query live databases.
 
 ## Core principle: semantic catalog first, live database last

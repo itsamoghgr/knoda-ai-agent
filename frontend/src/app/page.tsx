@@ -126,7 +126,7 @@ function Navbar() {
         <Link href="/" className="flex items-center gap-2.5">
           <KMark size={28} />
           <span className="text-lg font-bold tracking-tight" style={{ fontFamily: "var(--font-syne)" }}>
-            Luray.ai
+            Knoda AI
           </span>
         </Link>
 
@@ -250,7 +250,7 @@ function HeroChatCard() {
           <span className="h-2.5 w-2.5 rounded-full bg-yellow-400/70" />
           <span className="h-2.5 w-2.5 rounded-full bg-green-400/70" />
         </div>
-        <span className="text-muted-foreground text-[10px] ml-1">luray · analyst</span>
+        <span className="text-muted-foreground text-[10px] ml-1">knoda · analyst</span>
         <span className="ml-auto flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span className="text-[10px] text-emerald-500">live</span>
@@ -362,7 +362,7 @@ function Hero() {
               transition={{ duration: 0.6, delay: 0.15 }}
               className="text-lg text-muted-foreground leading-relaxed max-w-lg"
             >
-              Luray connects to your database, maps everything it finds, and becomes the data analyst your team never had to hire. Ask questions. Get answers. In meetings, in Slack, in seconds.
+              Knoda connects to your database, maps everything it finds, and becomes the data analyst your team never had to hire. Ask questions. Get answers. In meetings, in Slack, in seconds.
             </motion.p>
 
             <motion.div
@@ -533,7 +533,7 @@ const STEPS = [
   {
     n: "02",
     icon: Brain,
-    title: "Luray maps everything",
+    title: "Knoda maps everything",
     body: "The agent explores your schema, classifies every table, infers relationships, and builds AI Memory — a persistent understanding of your data.",
   },
   {
@@ -682,7 +682,7 @@ function AnalystFlowCard() {
       <motion.div {...panel(0.3)} className="rounded-xl border bg-card p-4 space-y-1.5">
         <div className="flex items-center gap-2 mb-2">
           <Brain className="h-3.5 w-3.5 text-primary" />
-          <span className="text-[10px] text-primary">luray · reasoning</span>
+          <span className="text-[10px] text-primary">knoda · reasoning</span>
         </div>
         <p className="text-muted-foreground">→ Searching AI Memory for churn tables...</p>
         <p className="text-muted-foreground">→ Found: subscription_events, user_regions</p>
@@ -743,7 +743,7 @@ function MeetingCard() {
     >
       {/* Top bar */}
       <div className="flex items-center justify-between border-b px-4 py-2.5 bg-muted/30">
-        <span className="text-[10px] text-muted-foreground">Luray · Q4 Review · 4 participants</span>
+        <span className="text-[10px] text-muted-foreground">Knoda · Q4 Review · 4 participants</span>
         <div className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-red-400 animate-pulse" />
           <span className="text-[10px] text-red-500">REC</span>
@@ -765,7 +765,7 @@ function MeetingCard() {
           </div>
         ))}
 
-        {/* Luray tile */}
+        {/* Knoda tile */}
         <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 flex flex-col items-center gap-2 relative">
           <div className="relative">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20">
@@ -774,7 +774,7 @@ function MeetingCard() {
             {/* Pulse ring */}
             <span className="absolute inset-0 rounded-full border-2 border-primary/60 animate-ping" />
           </div>
-          <span className="text-[10px] text-primary font-semibold">Luray AI</span>
+          <span className="text-[10px] text-primary font-semibold">Knoda AI</span>
           {/* Waveform */}
           <div className="flex items-center gap-0.5 h-3">
             {[3, 5, 8, 6, 10, 7, 4, 9, 5, 3].map((h, i) => (
@@ -874,21 +874,21 @@ function FeaturesSection() {
     <section id="features">
       <FeatureBlock
         label="01 · AI Memory"
-        headline="Luray knows your data."
-        body="The Discovery Agent maps your entire database — schema, relationships, entities, measures. Every table classified. Every column understood. Stored in AI Memory so Luray never has to learn from scratch again. It gets smarter with every interaction."
+        headline="Knoda knows your data."
+        body="The Discovery Agent maps your entire database — schema, relationships, entities, measures. Every table classified. Every column understood. Stored in AI Memory so Knoda never has to learn from scratch again. It gets smarter with every interaction."
         visual={<TableDiscoveryCard />}
       />
       <FeatureBlock
         label="02 · Analyst Agent"
         headline={"Ask in plain English.\nGet SQL-powered answers."}
-        body="Not a chatbot. An agent. Luray reads from AI Memory, reasons step-by-step, writes the SQL, runs it against your live database, and delivers the answer — as a number, a chart, or a dashboard. Works in your chat interface, in Slack, or spoken aloud in a live meeting."
+        body="Not a chatbot. An agent. Knoda reads from AI Memory, reasons step-by-step, writes the SQL, runs it against your live database, and delivers the answer — as a number, a chart, or a dashboard. Works in your chat interface, in Slack, or spoken aloud in a live meeting."
         visual={<AnalystFlowCard />}
         reverse
       />
       <FeatureBlock
         label="03 · Communication Agent"
         headline={"Your AI analyst,\nin every meeting."}
-        body="Luray joins your Zoom, Teams, or Meet call as a participant. It presents your dashboards with voice, walks through each chart with live insights, and answers questions from the audience in real time using live data. Before the call ends, it has already built the follow-up charts you asked for."
+        body="Knoda joins your Zoom, Teams, or Meet call as a participant. It presents your dashboards with voice, walks through each chart with live insights, and answers questions from the audience in real time using live data. Before the call ends, it has already built the follow-up charts you asked for."
         visual={<MeetingCard />}
       />
     </section>
@@ -965,7 +965,7 @@ function ContactSection() {
             Curious? Let&apos;s talk.
           </h2>
           <p className="text-muted-foreground leading-relaxed">
-            Whether you&apos;re a potential user, design partner, or investor — reach out and let&apos;s explore what Luray can do for your team.
+            Whether you&apos;re a potential user, design partner, or investor — reach out and let&apos;s explore what Knoda can do for your team.
           </p>
         </motion.div>
 
@@ -1003,7 +1003,7 @@ function Footer() {
           <div className="flex flex-col items-center md:items-start gap-1">
             <div className="flex items-center gap-2">
               <KMark size={20} />
-              <span className="font-bold text-sm" style={{ fontFamily: "var(--font-syne)" }}>Luray.ai</span>
+              <span className="font-bold text-sm" style={{ fontFamily: "var(--font-syne)" }}>Knoda AI</span>
             </div>
             <p className="text-xs text-muted-foreground">The AI that knows your data.</p>
           </div>
@@ -1023,7 +1023,7 @@ function Footer() {
           </div>
         </div>
         <Separator className="my-6" />
-        <p className="text-center text-xs text-muted-foreground">© 2025 Luray.ai. All rights reserved.</p>
+        <p className="text-center text-xs text-muted-foreground">© 2025 Knoda AI. All rights reserved.</p>
       </div>
     </footer>
   );

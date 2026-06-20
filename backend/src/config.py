@@ -106,7 +106,7 @@ class Settings(BaseSettings):
         ),
     )
     meet_bot_name: str = Field(
-        default="Luray AI",
+        default="Knoda AI",
         description="Display name the bot uses when joining Google Meet",
     )
 

@@ -150,9 +150,9 @@ function SidebarInner() {
 
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-4 py-5 border-b">
-        <Image src="/luray.svg" alt="Luray.ai" width={28} height={28} className="shrink-0" />
+        <Image src="/knoda.svg" alt="Knoda AI" width={28} height={28} className="shrink-0" />
         <div>
-          <p className="text-sm font-semibold leading-none">Luray.ai</p>
+          <p className="text-sm font-semibold leading-none">Knoda AI</p>
           <p className="text-[10px] text-muted-foreground mt-0.5 leading-none">Agent</p>
         </div>
       </div>
