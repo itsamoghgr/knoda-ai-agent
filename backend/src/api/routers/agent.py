@@ -19,9 +19,35 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import uuid
-from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from langchain_core.messages import AIMessage, HumanMessage
+from pydantic import BaseModel, Field
+from sse_starlette.sse import EventSourceResponse
+
+from agents.analyst import build_analyst_agent
+from agents.core import AgentToolsContext, build_llm
+from agents.discovery import build_discovery_agent
+from agents.supervisor import build_supervisor
+from api.dependencies import CurrentUser, get_current_user
+from api.rate_limit import limiter
+from models.connection import SourceConfig
+from storage import source_config_cache
+from storage.database import AsyncSessionFactory
+from storage.redis_client import get_checkpointer
+from storage.repositories import JobRepository
+from storage.repositories.long_term_repo import ConversationRepository
+from storage.repositories.settings_repo import SettingsRepository, format_business_context_for_agent
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+logger = logging.getLogger(__name__)
+router = APIRouter(tags=["agent"])
 
 # ── Per-tenant abort registry ─────────────────────────────────────────────────
 # Maps tenant_id → asyncio.Event. Set the event to abort all in-flight streams
@@ -35,28 +61,6 @@ def abort_tenant_streams(tenant_id: str) -> None:
     if event:
         event.set()
 
-from fastapi import APIRouter, Depends, HTTPException, Request
-from langchain_core.messages import AIMessage, HumanMessage
-from pydantic import BaseModel, Field
-from sse_starlette.sse import EventSourceResponse
-
-from api.rate_limit import limiter
-
-from agents.analyst import build_analyst_agent
-from agents.core import AgentToolsContext, build_llm
-from agents.discovery import build_discovery_agent
-from agents.supervisor import build_supervisor
-from api.dependencies import CurrentUser, get_current_user
-from models.connection import SourceConfig
-from storage import source_config_cache
-from storage.database import AsyncSessionFactory
-from storage.repositories import JobRepository
-from storage.repositories.long_term_repo import ConversationRepository
-from storage.repositories.settings_repo import SettingsRepository, format_business_context_for_agent
-from storage.redis_client import get_checkpointer
-
-logger = logging.getLogger(__name__)
-router = APIRouter(tags=["agent"])
 
 # ── Friendly status labels for tool calls ─────────────────────────────────────
 _TOOL_STATUS_LABELS: dict[str, str] = {
@@ -88,7 +92,6 @@ _ROUTING_PATTERNS = [
     "ROUTE:discovery",
 ]
 
-import re
 _ROUTE_TAG_RE = re.compile(r"<route>\s*(?:analyst|discovery)\s*</route>")
 
 
@@ -151,15 +154,14 @@ async def run_agent(
     retry_queue: asyncio.Queue[str] = asyncio.Queue()
 
     if provider == "anthropic" and api_key:
-        import httpx
         import anthropic as _anthropic
+        import httpx
         from langchain_anthropic import ChatAnthropic
 
         async def _on_response(response: httpx.Response) -> None:
             if response.status_code == 429:
-                ra = (
-                    response.headers.get("retry-after")
-                    or response.headers.get("x-ratelimit-reset-requests")
+                ra = response.headers.get("retry-after") or response.headers.get(
+                    "x-ratelimit-reset-requests"
                 )
                 wait = f"{ra}s" if ra else "a moment"
                 retry_queue.put_nowait(f"Rate limit reached — retrying in {wait}…")
@@ -197,15 +199,14 @@ async def run_agent(
                 except Exception as exc:
                     logger.warning(
                         "Could not reconstruct SourceConfig for job %s: %s",
-                        body.job_id, exc,
+                        body.job_id,
+                        exc,
                     )
     else:
         # Only get configs for this tenant from cache
         all_cached = source_config_cache.all_configs()
         prefix = f"{tenant_id}:"
-        job_configs = {
-            k[len(prefix):]: v for k, v in all_cached.items() if k.startswith(prefix)
-        }
+        job_configs = {k[len(prefix) :]: v for k, v in all_cached.items() if k.startswith(prefix)}
         if not job_configs:
             async with AsyncSessionFactory() as _jr_session:
                 raw_configs = await JobRepository(_jr_session, tenant_id).list_all_source_configs()
@@ -260,7 +261,7 @@ async def run_agent(
                     _thread_config["configurable"] = {"thread_id": thread_id}
                     logger.info("Agent: short-term memory enabled, thread_id=%s", thread_id)
 
-            _now_utc = datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            _now_utc = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
             agent_to_run = build_supervisor(
                 llm, discovery_agent, analyst_agent, ctx=ctx, current_utc_time=_now_utc
             )
@@ -279,7 +280,7 @@ async def run_agent(
             total_output_tokens = 0
             active_tool_run_id: str | None = None
             final_assistant_content: list[str] = []  # v2: collect for audit log
-            final_tool_calls: dict = {}              # v2: collect tool call metadata
+            final_tool_calls: dict = {}  # v2: collect tool call metadata
             # Per-request tool call counters for progress labels (e.g. "Creating chart (3)…")
             tool_call_counts: dict[str, int] = {}
             _COUNTABLE_TOOLS = {"create_chart", "execute_sql", "describe_table"}
@@ -294,7 +295,9 @@ async def run_agent(
                     if abort_event.is_set():
                         yield {
                             "event": "error",
-                            "data": json.dumps({"message": "LLM provider changed — please resend your message."}),
+                            "data": json.dumps(
+                                {"message": "LLM provider changed — please resend your message."}
+                            ),
                         }
                         return
 
@@ -342,11 +345,13 @@ async def run_agent(
                                     meta = {
                                         "input_tokens": (
                                             raw_usage.get("input_tokens")
-                                            or raw_usage.get("prompt_tokens") or 0
+                                            or raw_usage.get("prompt_tokens")
+                                            or 0
                                         ),
                                         "output_tokens": (
                                             raw_usage.get("output_tokens")
-                                            or raw_usage.get("completion_tokens") or 0
+                                            or raw_usage.get("completion_tokens")
+                                            or 0
                                         ),
                                     }
                             if meta:
@@ -391,11 +396,13 @@ async def run_agent(
 
                         yield {
                             "event": "tool_call",
-                            "data": json.dumps({
-                                "id": run_id,
-                                "name": tool_name,
-                                "input": tool_input,
-                            }),
+                            "data": json.dumps(
+                                {
+                                    "id": run_id,
+                                    "name": tool_name,
+                                    "input": tool_input,
+                                }
+                            ),
                         }
 
                     # ── Tool call result ──────────────────────────────────────
@@ -431,13 +438,15 @@ async def run_agent(
 
                         yield {
                             "event": "tool_result",
-                            "data": json.dumps({
-                                "id": run_id,
-                                "rows": rows,
-                                "text": text,
-                                "truncated": truncated,
-                                "error": error,
-                            }),
+                            "data": json.dumps(
+                                {
+                                    "id": run_id,
+                                    "rows": rows,
+                                    "text": text,
+                                    "truncated": truncated,
+                                    "error": error,
+                                }
+                            ),
                         }
                         # v2: track tool calls for audit log
                         tool_name_for_log = ev.get("name", "tool")
@@ -499,7 +508,10 @@ async def run_agent(
 
             except Exception as exc:
                 logger.error("Agent streaming error: %s", exc, exc_info=True)
-                yield {"event": "error", "data": json.dumps({"message": "An error occurred. Please try again."})}
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"message": "An error occurred. Please try again."}),
+                }
             finally:
                 _active_streams.pop(tenant_id, None)
 

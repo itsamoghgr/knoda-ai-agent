@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import delete, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from storage.orm.embedding import TableEmbeddingORM
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class EmbeddingRepository:
@@ -51,8 +54,7 @@ class EmbeddingRepository:
         vector_str = "[" + ",".join(str(v) for v in embedding) + "]"
         await self._db.execute(
             text(
-                f"UPDATE table_embeddings SET embedding = '{vector_str}'::vector "
-                "WHERE id = :row_id"
+                f"UPDATE table_embeddings SET embedding = '{vector_str}'::vector WHERE id = :row_id"
             ),
             {"row_id": row.id},
         )
@@ -86,9 +88,7 @@ class EmbeddingRepository:
                 f"ORDER BY embedding <=> '{vector_str}'::vector "
                 "LIMIT :k"
             )
-            result = await self._db.execute(
-                sql, {"tenant_id": self._tenant_id, "k": top_k}
-            )
+            result = await self._db.execute(sql, {"tenant_id": self._tenant_id, "k": top_k})
 
         rows = result.fetchall()
         return [_row_to_orm(r) for r in rows]

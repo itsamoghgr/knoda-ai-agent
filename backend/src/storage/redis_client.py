@@ -36,11 +36,11 @@ def get_redis() -> aioredis.Redis:
     global _pool
     if _pool is None:
         kwargs: dict = dict(
-            decode_responses=True,   # all values returned as str, not bytes
+            decode_responses=True,  # all values returned as str, not bytes
             encoding="utf-8",
             socket_connect_timeout=2,  # fail fast when Redis is unreachable
-            socket_timeout=2,          # fail fast on hung operations
-            retry_on_timeout=False,    # don't retry — let caller handle gracefully
+            socket_timeout=2,  # fail fast on hung operations
+            retry_on_timeout=False,  # don't retry — let caller handle gracefully
         )
         if settings.redis_url.startswith("rediss://"):
             # DigitalOcean managed Redis uses TLS (rediss://) but its CA cert is not

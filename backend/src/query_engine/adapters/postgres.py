@@ -10,8 +10,7 @@ def build_attach_sql(config: SourceConfig, alias: str) -> str:
     username = quote(config.username or "", safe="")
     password = quote(password, safe="")
     dsn = (
-        f"postgresql://{username}:{password}"
-        f"@{config.host}:{config.port or 5432}/{config.database}"
+        f"postgresql://{username}:{password}@{config.host}:{config.port or 5432}/{config.database}"
     )
     return f"ATTACH '{dsn}' AS {alias} (TYPE postgres, READ_ONLY)"
 

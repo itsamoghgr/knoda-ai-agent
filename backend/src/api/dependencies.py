@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.ext.asyncio import AsyncSession
 from supabase._async.client import AsyncClient
 from supabase._async.client import create_client as _create_supabase
 
@@ -21,6 +20,11 @@ from storage.repositories import (
     SchemaRepository,
     SemanticRepository,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -47,6 +51,7 @@ async def _get_supabase() -> AsyncClient:
 @dataclass
 class CurrentUser:
     """Authenticated caller extracted from the Supabase JWT."""
+
     id: str  # UUID string — used as tenant_id for all DB queries
 
 
@@ -66,11 +71,12 @@ async def get_current_user(
     if bot_session_id:
         try:
             import json as _json
+
             from storage.redis_client import get_redis
+
             # Scan all tenant-scoped keys for this session_id
             redis = get_redis()
             pattern = f"present_session:*:{bot_session_id}"
-            cursor = 0
             async for key in redis.scan_iter(pattern, count=10):
                 raw = await redis.get(key)
                 if raw:
@@ -102,7 +108,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {exc}",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from exc
 
     if response.user is None:
         raise HTTPException(
@@ -134,6 +140,7 @@ async def verify_job_ownership(
 
 
 # ── Repository providers ──────────────────────────────────────────────────────
+
 
 async def get_job_repo(
     db: AsyncSession = Depends(get_db),

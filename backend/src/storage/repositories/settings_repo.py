@@ -30,13 +30,13 @@ SUPPORTED_PROVIDERS = ("openai", "anthropic", "ollama", "groq", "featherless")
 
 _BUSINESS_CONTEXT_LABELS: dict[str, str] = {
     "company_description": "Company overview",
-    "business_model":      "Business model",
-    "fiscal_year_start":   "Fiscal year start",
-    "currency":            "Reporting currency",
-    "revenue_definition":  "Revenue definition",
-    "churn_definition":    "Churned customer definition",
-    "exclusions":          "Standard data exclusions",
-    "additional_context":  "Additional context",
+    "business_model": "Business model",
+    "fiscal_year_start": "Fiscal year start",
+    "currency": "Reporting currency",
+    "revenue_definition": "Revenue definition",
+    "churn_definition": "Churned customer definition",
+    "exclusions": "Standard data exclusions",
+    "additional_context": "Additional context",
 }
 
 
@@ -101,7 +101,9 @@ class SettingsRepository:
 
     # ── Supabase Vault helpers ─────────────────────────────────────────────────
 
-    async def _vault_store(self, secret_name: str, api_key: str, existing_vault_id: str | None) -> str:
+    async def _vault_store(
+        self, secret_name: str, api_key: str, existing_vault_id: str | None
+    ) -> str:
         """Store an API key in Supabase Vault. Returns the vault UUID."""
         if existing_vault_id:
             await self._db.execute(
@@ -124,7 +126,9 @@ class SettingsRepository:
         if not vault_id:
             return None
         result = await self._db.execute(
-            text("SELECT decrypted_secret FROM vault.decrypted_secrets WHERE id = cast(:id as uuid)"),
+            text(
+                "SELECT decrypted_secret FROM vault.decrypted_secrets WHERE id = cast(:id as uuid)"
+            ),
             {"id": vault_id},
         )
         return result.scalar()
@@ -159,9 +163,7 @@ class SettingsRepository:
         api_key = await self._vault_read(vault_id) if vault_id else ""
         return {"model": cfg.get("model"), "api_key": api_key or ""}
 
-    async def save_provider_config(
-        self, provider: str, model: str, api_key: str | None
-    ) -> None:
+    async def save_provider_config(self, provider: str, model: str, api_key: str | None) -> None:
         """Upsert config for a specific provider. api_key=None keeps the existing key."""
         existing_raw = await self._get_raw_config(provider) or {}
         existing_vault_id: str | None = existing_raw.get("api_key_vault_id")

@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 class JobStatus(StrEnum):
     PENDING = "pending"
     BOOTSTRAPPING = "bootstrapping"  # Fast catalog schema discovery (no LLM, no table scans)
-    RUNNING = "running"              # Agent session — reasoning, querying, saving models
+    RUNNING = "running"  # Agent session — reasoning, querying, saving models
     COMPLETED = "completed"
     FAILED = "failed"
     CANCELLED = "cancelled"

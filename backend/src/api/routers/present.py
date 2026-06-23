@@ -14,7 +14,7 @@ import json
 import logging
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
@@ -45,7 +45,7 @@ router = APIRouter(prefix="/present", tags=["presentation"])
 #   Any worker can serve any session — multi-worker deployment unlocked.
 
 _SESSION_PREFIX = "present_session:"
-SESSION_TTL = 3_600   # 1 hour in seconds
+SESSION_TTL = 3_600  # 1 hour in seconds
 MAX_HISTORY_EXCHANGES = 10
 
 
@@ -86,8 +86,10 @@ async def _delete_session(session_id: str, tenant_id: str = "") -> None:
 # It remains as a no-op to avoid import errors from any callers in main.py.
 def start_session_cleanup() -> asyncio.Task:
     """Deprecated: Redis TTL handles session eviction automatically."""
+
     async def _noop() -> None:
         pass
+
     return asyncio.create_task(_noop())
 
 
@@ -95,7 +97,7 @@ def start_session_cleanup() -> asyncio.Task:
 
 
 class TtsRequest(BaseModel):
-    text: str = Field(..., max_length=4_096)   # OpenAI TTS hard limit
+    text: str = Field(..., max_length=4_096)  # OpenAI TTS hard limit
     voice: str = Field("alloy", max_length=20)
 
 
@@ -184,7 +186,8 @@ async def create_session(
         ) from exc
     logger.info(
         "Created presentation session %s for dashboard %s",
-        session_id[:8], dashboard_id[:8],
+        session_id[:8],
+        dashboard_id[:8],
     )
     return {"session_id": session_id}
 
@@ -270,12 +273,15 @@ async def ask_session(
             all_cached = source_config_cache.all_configs()
             prefix = f"{tenant_id}:" if tenant_id else ""
             job_configs: dict[str, SourceConfig] = (
-                {k[len(prefix):]: v for k, v in all_cached.items() if k.startswith(prefix)}
-                if prefix else dict(all_cached)
+                {k[len(prefix) :]: v for k, v in all_cached.items() if k.startswith(prefix)}
+                if prefix
+                else dict(all_cached)
             )
             if not job_configs:
                 async with AsyncSessionFactory() as jr_session:
-                    raw_configs = await JobRepository(jr_session, tenant_id).list_all_source_configs()
+                    raw_configs = await JobRepository(
+                        jr_session, tenant_id
+                    ).list_all_source_configs()
                 for jid, raw in raw_configs.items():
                     try:
                         cfg = SourceConfig(**raw)
@@ -291,13 +297,9 @@ async def ask_session(
                 try:
                     alias = engine.attach(cfg)
                     alias_map[jid] = alias
-                    logger.info(
-                        "CommAgent: attached job %s as alias '%s'", jid[:8], alias
-                    )
+                    logger.info("CommAgent: attached job %s as alias '%s'", jid[:8], alias)
                 except Exception as exc:
-                    logger.warning(
-                        "CommAgent: could not attach DB for job %s: %s", jid[:8], exc
-                    )
+                    logger.warning("CommAgent: could not attach DB for job %s: %s", jid[:8], exc)
 
             ctx = AgentToolsContext(
                 job_id=next(iter(job_configs), ""),
@@ -312,13 +314,15 @@ async def ask_session(
             # Build LangChain message list from session history + current message
             lc_messages: list = []
             for h in history_snapshot:
-                if h["role"] == "user" and h.get("content"):   # skip empty — Anthropic rejects them
+                if h["role"] == "user" and h.get("content"):  # skip empty — Anthropic rejects them
                     lc_messages.append(HumanMessage(content=h["content"]))
                 elif h["role"] == "assistant" and h.get("content"):
                     lc_messages.append(AIMessage(content=h["content"]))
             # Anthropic rejects empty-string messages — convert the narration trigger
             # to an explicit instruction. The agent's prompt handles this case.
-            effective_message = current_message.strip() or "Please begin your presentation of this dashboard now."
+            effective_message = (
+                current_message.strip() or "Please begin your presentation of this dashboard now."
+            )
             lc_messages.append(HumanMessage(content=effective_message))
 
             total_input_tokens = 0
@@ -347,10 +351,7 @@ async def ask_session(
                                 }
                             elif isinstance(content, list):
                                 for block in content:
-                                    if (
-                                        isinstance(block, dict)
-                                        and block.get("type") == "text"
-                                    ):
+                                    if isinstance(block, dict) and block.get("type") == "text":
                                         t = block.get("text", "")
                                         if t:
                                             full_response += t
@@ -364,15 +365,9 @@ async def ask_session(
                         output = ev["data"].get("output")
                         if output:
                             meta = None
-                            if (
-                                hasattr(output, "usage_metadata")
-                                and output.usage_metadata
-                            ):
+                            if hasattr(output, "usage_metadata") and output.usage_metadata:
                                 meta = output.usage_metadata
-                            elif (
-                                hasattr(output, "response_metadata")
-                                and output.response_metadata
-                            ):
+                            elif hasattr(output, "response_metadata") and output.response_metadata:
                                 rm = output.response_metadata
                                 raw_usage = (
                                     rm.get("usage")
@@ -414,11 +409,13 @@ async def ask_session(
                             tool_input = str(raw_input)
                         yield {
                             "event": "tool_call",
-                            "data": json.dumps({
-                                "id": run_id,
-                                "name": tool_name,
-                                "input": tool_input,
-                            }),
+                            "data": json.dumps(
+                                {
+                                    "id": run_id,
+                                    "name": tool_name,
+                                    "input": tool_input,
+                                }
+                            ),
                         }
 
                     # ── Tool call result ──────────────────────────────────────
@@ -452,13 +449,15 @@ async def ask_session(
 
                         yield {
                             "event": "tool_result",
-                            "data": json.dumps({
-                                "id": run_id,
-                                "rows": rows,
-                                "text": text,
-                                "truncated": truncated,
-                                "error": error,
-                            }),
+                            "data": json.dumps(
+                                {
+                                    "id": run_id,
+                                    "rows": rows,
+                                    "text": text,
+                                    "truncated": truncated,
+                                    "error": error,
+                                }
+                            ),
                         }
 
                 # ── Save token usage ──────────────────────────────────────────
@@ -487,9 +486,7 @@ async def ask_session(
                     ]
                     max_messages = MAX_HISTORY_EXCHANGES * 2
                     session.history = (
-                        updated[-max_messages:]
-                        if len(updated) > max_messages
-                        else updated
+                        updated[-max_messages:] if len(updated) > max_messages else updated
                     )
                     await _save_session(session)  # write updated history to Redis
 
@@ -497,6 +494,9 @@ async def ask_session(
 
             except Exception as exc:
                 logger.error("Communication agent error: %s", exc, exc_info=True)
-                yield {"event": "error", "data": json.dumps({"message": "An error occurred. Please try again."})}
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"message": "An error occurred. Please try again."}),
+                }
 
     return EventSourceResponse(stream_response())

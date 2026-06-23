@@ -29,8 +29,8 @@ from agents.core import (
     tool_get_relationships,
     tool_get_semantic_catalog,
     tool_list_charts,
-    tool_list_databases,
     tool_list_dashboards,
+    tool_list_databases,
     tool_search_tables,
 )
 

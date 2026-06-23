@@ -11,12 +11,13 @@ Endpoints:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import hmac
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from api.dependencies import CurrentUser, get_current_user
@@ -35,13 +36,17 @@ router = APIRouter(prefix="/meetings", tags=["meetings"])
 class MeetingScheduleRequest(BaseModel):
     meet_url: str = Field(..., description="Full Google Meet URL (https://meet.google.com/...)")
     dashboard_id: str = Field(..., description="UUID of the dashboard to present")
-    scheduled_at: datetime = Field(..., description="When to join — must be in the future (timezone-aware ISO 8601)")
+    scheduled_at: datetime = Field(
+        ..., description="When to join — must be in the future (timezone-aware ISO 8601)"
+    )
 
     @field_validator("meet_url")
     @classmethod
     def validate_meet_url(cls, v: str) -> str:
         if not v.startswith("https://meet.google.com/"):
-            raise ValueError("meet_url must be a valid Google Meet URL (https://meet.google.com/...)")
+            raise ValueError(
+                "meet_url must be a valid Google Meet URL (https://meet.google.com/...)"
+            )
         return v
 
     @field_validator("scheduled_at")
@@ -49,7 +54,7 @@ class MeetingScheduleRequest(BaseModel):
     def must_be_future(cls, v: datetime) -> datetime:
         if v.tzinfo is None:
             raise ValueError("scheduled_at must be timezone-aware (include UTC offset or Z)")
-        if v <= datetime.now(tz=timezone.utc):
+        if v <= datetime.now(tz=UTC):
             raise ValueError("scheduled_at must be in the future")
         return v
 
@@ -92,6 +97,7 @@ async def schedule_meeting(
 
         # Verify the dashboard belongs to this tenant
         from storage.repositories.charts_repo import DashboardRepository
+
         dashboard = await DashboardRepository(db, current_user.id).get(body.dashboard_id)
         if dashboard is None:
             raise HTTPException(status_code=404, detail="Dashboard not found")
@@ -147,13 +153,17 @@ async def get_meeting(
 class MeetingUpdateRequest(BaseModel):
     meet_url: str | None = Field(None, description="New Google Meet URL")
     dashboard_id: str | None = Field(None, description="New dashboard UUID")
-    scheduled_at: datetime | None = Field(None, description="New scheduled time (timezone-aware ISO 8601)")
+    scheduled_at: datetime | None = Field(
+        None, description="New scheduled time (timezone-aware ISO 8601)"
+    )
 
     @field_validator("meet_url")
     @classmethod
     def validate_meet_url(cls, v: str | None) -> str | None:
         if v is not None and not v.startswith("https://meet.google.com/"):
-            raise ValueError("meet_url must be a valid Google Meet URL (https://meet.google.com/...)")
+            raise ValueError(
+                "meet_url must be a valid Google Meet URL (https://meet.google.com/...)"
+            )
         return v
 
     @field_validator("scheduled_at")
@@ -163,7 +173,7 @@ class MeetingUpdateRequest(BaseModel):
             return v
         if v.tzinfo is None:
             raise ValueError("scheduled_at must be timezone-aware")
-        if v <= datetime.now(tz=timezone.utc):
+        if v <= datetime.now(tz=UTC):
             raise ValueError("scheduled_at must be in the future")
         return v
 
@@ -194,10 +204,8 @@ async def update_meeting(
 
     # Reschedule APScheduler job if time changed
     if body.scheduled_at is not None:
-        try:
+        with contextlib.suppress(Exception):
             cancel_meeting_job(meeting_id)
-        except Exception:
-            pass
         await schedule_meeting_job(
             meeting_id=meeting_id,
             meet_url=orm.meet_url,
@@ -251,10 +259,8 @@ async def delete_meeting(
         await repo.delete(meeting_id)
 
     # Best-effort: remove any lingering APScheduler job
-    try:
+    with contextlib.suppress(Exception):
         cancel_meeting_job(meeting_id)
-    except Exception:
-        pass
 
     return {"deleted": meeting_id}
 
@@ -311,9 +317,10 @@ async def transcript_webhook(
 
     try:
         import json
+
         payload = json.loads(body_bytes)
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from exc
 
     bot_id = payload.get("bot_id", "")
     transcript = payload.get("transcript", {})

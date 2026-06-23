@@ -33,7 +33,7 @@ class RecallClient:
             timeout=30.0,
         )
 
-    async def __aenter__(self) -> "RecallClient":
+    async def __aenter__(self) -> RecallClient:
         return self
 
     async def __aexit__(self, *_) -> None:
@@ -55,11 +55,13 @@ class RecallClient:
         # until a transcription provider is set up.
         realtime_endpoints = []
         if webhook_url:
-            realtime_endpoints.append({
-                "type": "webhook",
-                "url": webhook_url,
-                "events": ["participant_events.join", "participant_events.leave"],
-            })
+            realtime_endpoints.append(
+                {
+                    "type": "webhook",
+                    "url": webhook_url,
+                    "events": ["participant_events.join", "participant_events.leave"],
+                }
+            )
 
         # A 1-second silent MP3 (base64) — required to enable the output_audio endpoint.
         # Without automatic_audio_output configured at creation time, output_audio calls fail.

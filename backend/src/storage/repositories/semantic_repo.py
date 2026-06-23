@@ -98,7 +98,9 @@ class SemanticRepository:
                 selectinload(SemanticModelORM.dimensions),
                 selectinload(SemanticModelORM.measures),
             )
-            .order_by(SemanticModelORM.job_id, SemanticModelORM.schema_name, SemanticModelORM.table_name)
+            .order_by(
+                SemanticModelORM.job_id, SemanticModelORM.schema_name, SemanticModelORM.table_name
+            )
         )
         return [(row.job_id, self._to_model(row)) for row in result.scalars().all()]
 

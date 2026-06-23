@@ -14,9 +14,7 @@ class JobORM(Base):
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    tenant_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), nullable=False, index=True
-    )
+    tenant_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending", index=True)
     source_type: Mapped[str] = mapped_column(String(32), nullable=False)
     source_config_safe: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)

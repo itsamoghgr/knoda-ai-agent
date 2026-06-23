@@ -224,7 +224,6 @@ class QueryEngine:
 # ---------------------------------------------------------------------------
 
 
-
 def _source_key(cfg) -> tuple:
     """Stable identity key for a SourceConfig connection.
 
@@ -288,13 +287,16 @@ async def run_queries_parallel(
                 eng.attach(cfg)
                 logger.debug(
                     "run_queries_parallel: group of %d queries sharing one connection to %s",
-                    len(items), getattr(cfg, "host", getattr(cfg, "file_path", "unknown")),
+                    len(items),
+                    getattr(cfg, "host", getattr(cfg, "file_path", "unknown")),
                 )
                 for orig_idx, _, sql in items:
                     try:
                         rows = eng.execute_unlimited(sql)
                         columns = list(rows[0].keys()) if rows else []
-                        results.append((orig_idx, {"columns": columns, "rows": rows, "error": None}))
+                        results.append(
+                            (orig_idx, {"columns": columns, "rows": rows, "error": None})
+                        )
                     except Exception as exc:
                         logger.warning("run_queries_parallel: query[%d] failed: %s", orig_idx, exc)
                         results.append((orig_idx, {"columns": [], "rows": [], "error": str(exc)}))
@@ -302,7 +304,8 @@ async def run_queries_parallel(
             # Connection-level failure — mark all queries in this group as failed
             logger.warning(
                 "run_queries_parallel: failed to connect for group of %d queries: %s",
-                len(items), exc,
+                len(items),
+                exc,
             )
             for orig_idx, _, _ in items:
                 results.append((orig_idx, {"columns": [], "rows": [], "error": str(exc)}))
@@ -314,10 +317,7 @@ async def run_queries_parallel(
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=min(n_groups, max_workers))
 
     try:
-        tasks = [
-            loop.run_in_executor(pool, _run_group, items)
-            for items in groups.values()
-        ]
+        tasks = [loop.run_in_executor(pool, _run_group, items) for items in groups.values()]
         group_results = await asyncio.gather(*tasks)
     finally:
         pool.shutdown(wait=False)

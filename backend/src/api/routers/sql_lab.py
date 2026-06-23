@@ -11,9 +11,9 @@ from pydantic import BaseModel
 from api.dependencies import CurrentUser, get_current_user, get_job_repo
 from api.rate_limit import limiter
 from models.connection import SourceConfig
+from query_engine.engine import QueryEngine
 from storage import source_config_cache
 from storage.repositories import JobRepository
-from query_engine.engine import QueryEngine
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/sql", tags=["sql-lab"])
@@ -40,12 +40,12 @@ class SqlResponse(BaseModel):
 class SchemaTable(BaseModel):
     schema_name: str
     table_name: str
-    table_type: str       # "BASE TABLE" | "VIEW"
-    qualified_name: str   # e.g. "src0.public.users"
+    table_type: str  # "BASE TABLE" | "VIEW"
+    qualified_name: str  # e.g. "src0.public.users"
 
 
 class SchemaResponse(BaseModel):
-    alias: str            # always "src0" for single-db SQL Lab queries
+    alias: str  # always "src0" for single-db SQL Lab queries
     tables: list[SchemaTable]
     error: str | None = None
 
@@ -73,7 +73,9 @@ async def run_sql_query(
                 cfg = SourceConfig(**raw)
                 source_config_cache.store(body.job_id, cfg, tenant_id=current_user.id)
             except Exception as exc:
-                logger.warning("Could not reconstruct SourceConfig for job %s: %s", body.job_id, exc)
+                logger.warning(
+                    "Could not reconstruct SourceConfig for job %s: %s", body.job_id, exc
+                )
 
     if cfg is None:
         # Check job even exists

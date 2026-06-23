@@ -7,8 +7,8 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import CurrentUser, get_current_user
-from storage.database import get_db
 from storage import snapshot_cache
+from storage.database import get_db
 from storage.repositories.charts_repo import ChartRepository
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class ChartResponse(BaseModel):
     config: dict
     created_at: str
     updated_at: str
-    snapshot: dict | None = None   # Redis snapshot data, None on cache miss
+    snapshot: dict | None = None  # Redis snapshot data, None on cache miss
 
 
 def _to_response(c, snap: dict | None = None) -> ChartResponse:
@@ -104,7 +104,7 @@ async def get_chart(
     c = await repo.get(chart_id)
     if c is None:
         raise HTTPException(status_code=404, detail="Chart not found")
-    snap = await snapshot_cache.get(chart_id)   # None on cache miss
+    snap = await snapshot_cache.get(chart_id)  # None on cache miss
     return _to_response(c, snap)
 
 

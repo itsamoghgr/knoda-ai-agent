@@ -9,13 +9,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from api.dependencies import CurrentUser, get_current_user, get_job_repo
-from storage.database import get_db
-from storage import snapshot_cache
 from models.connection import SourceConfig
-from storage import source_config_cache
-from storage.repositories import JobRepository
-from storage.repositories.charts_repo import DatasetRepository, ChartRepository
 from query_engine.engine import QueryEngine
+from storage import snapshot_cache, source_config_cache
+from storage.database import get_db
+from storage.repositories import JobRepository
+from storage.repositories.charts_repo import ChartRepository, DatasetRepository
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/datasets", tags=["datasets"])
@@ -153,7 +152,8 @@ async def update_dataset(
             await snapshot_cache.delete([c.id for c in charts])
             logger.info(
                 "Invalidated %d Redis snapshot(s) for dataset %s (SQL changed)",
-                len(charts), dataset_id,
+                len(charts),
+                dataset_id,
             )
 
     return DatasetResponse(
@@ -234,8 +234,7 @@ async def get_dataset_data(
             row_count=0,
             execution_time_ms=0,
             error=(
-                "No connection credentials found for this database. "
-                "Try re-connecting the database."
+                "No connection credentials found for this database. Try re-connecting the database."
             ),
         )
 

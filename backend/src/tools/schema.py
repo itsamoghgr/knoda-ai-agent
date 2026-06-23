@@ -17,16 +17,35 @@ def list_databases(engine: QueryEngine) -> list[str]:
 
 # System schemas exposed by Supabase and standard PostgreSQL that should be
 # excluded by default — users can override via source_config.include_schemas.
-_DEFAULT_SYSTEM_SCHEMAS: frozenset[str] = frozenset({
-    # Standard PostgreSQL
-    "information_schema", "pg_catalog", "pg_toast", "pg_temp_1", "pg_toast_temp_1",
-    # Supabase platform schemas
-    "auth", "storage", "extensions", "graphql", "graphql_public",
-    "pgsodium", "pgsodium_masks", "vault", "realtime", "_realtime",
-    "supabase_migrations", "supabase_functions", "cron", "pgbouncer",
-    # Other common system schemas
-    "tiger", "tiger_data", "topology",
-})
+_DEFAULT_SYSTEM_SCHEMAS: frozenset[str] = frozenset(
+    {
+        # Standard PostgreSQL
+        "information_schema",
+        "pg_catalog",
+        "pg_toast",
+        "pg_temp_1",
+        "pg_toast_temp_1",
+        # Supabase platform schemas
+        "auth",
+        "storage",
+        "extensions",
+        "graphql",
+        "graphql_public",
+        "pgsodium",
+        "pgsodium_masks",
+        "vault",
+        "realtime",
+        "_realtime",
+        "supabase_migrations",
+        "supabase_functions",
+        "cron",
+        "pgbouncer",
+        # Other common system schemas
+        "tiger",
+        "tiger_data",
+        "topology",
+    }
+)
 
 
 def list_schemas(

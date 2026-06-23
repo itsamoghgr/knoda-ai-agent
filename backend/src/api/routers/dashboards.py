@@ -5,15 +5,15 @@ re-executes all chart SQLs in parallel and updates Redis snapshots.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import CurrentUser, get_current_user
-from storage.database import get_db
 from storage import snapshot_cache
+from storage.database import get_db
 from storage.repositories.charts_repo import DashboardRepository
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,7 @@ class DashboardChartItem(BaseModel):
     chart_type: str
     dataset_id: str
     config: dict
-    snapshot: ChartSnapshotData | None = None   # None = no cached data
+    snapshot: ChartSnapshotData | None = None  # None = no cached data
 
 
 class DashboardResponse(BaseModel):
@@ -122,13 +122,15 @@ async def _auto_populate_missing(
 
     Only called when there are cache misses. Returns the updated snapshots dict.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
-    from storage.orm.charts import ChartORM
+
     from models.connection import SourceConfig
     from query_engine.engine import run_queries_parallel
     from storage import source_config_cache
+    from storage.orm.charts import ChartORM
 
     missing_set = set(missing_chart_ids)
 
@@ -146,7 +148,7 @@ async def _auto_populate_missing(
     job_repo = JobRepository(db, tenant_id)
     cfg_cache: dict[str, SourceConfig | None] = {}
 
-    valid: list[tuple] = []   # (chart_id, cfg, sql)
+    valid: list[tuple] = []  # (chart_id, cfg, sql)
     for chart in charts_with_data:
         if not chart.dataset:
             continue
@@ -170,7 +172,8 @@ async def _auto_populate_missing(
         if cfg is None:
             logger.debug(
                 "auto_populate: no SourceConfig for job %s, skipping chart %s",
-                job_id, chart.id,
+                job_id,
+                chart.id,
             )
             continue
         valid.append((chart.id, cfg, chart.dataset.sql))
@@ -183,9 +186,9 @@ async def _auto_populate_missing(
     results = await run_queries_parallel(pairs, max_workers=min(len(pairs), 6))
 
     # ── 4. Write to Redis + merge into snapshots ───────────────────────────────
-    cached_at = datetime.now(timezone.utc).isoformat()
+    cached_at = datetime.now(UTC).isoformat()
     updated = dict(snapshots)
-    for (chart_id, _, _), res in zip(valid, results):
+    for (chart_id, _, _), res in zip(valid, results, strict=False):
         await snapshot_cache.set(chart_id, res["columns"], res["rows"], cached_at=cached_at)
         updated[chart_id] = {
             "columns": res["columns"],
@@ -194,9 +197,7 @@ async def _auto_populate_missing(
             "cached_at": cached_at,
             "error": res.get("error"),
         }
-        logger.info(
-            "auto_populate: cached %d rows for chart %s", len(res["rows"]), chart_id
-        )
+        logger.info("auto_populate: cached %d rows for chart %s", len(res["rows"]), chart_id)
 
     return updated
 
@@ -250,26 +251,27 @@ async def get_dashboard(
         raise HTTPException(status_code=404, detail="Dashboard not found")
 
     chart_ids = [dc.chart_id for dc in d.dashboard_charts]
-    snapshots = await snapshot_cache.get_many(chart_ids)   # single Redis MGET
+    snapshots = await snapshot_cache.get_many(chart_ids)  # single Redis MGET
 
     # ── Auto-populate missing charts (inline with timeout) ────────────────────
     missing = [cid for cid in chart_ids if cid not in snapshots]
     if missing:
         logger.info(
             "Dashboard %s: %d/%d charts missing snapshots, auto-populating inline",
-            dashboard_id[:8], len(missing), len(chart_ids),
+            dashboard_id[:8],
+            len(missing),
+            len(chart_ids),
         )
         try:
             snapshots = await asyncio.wait_for(
-                _auto_populate_missing(
-                    missing, d.dashboard_charts, snapshots, db, current_user.id
-                ),
+                _auto_populate_missing(missing, d.dashboard_charts, snapshots, db, current_user.id),
                 timeout=_AUTO_POPULATE_TIMEOUT,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 "Dashboard %s: auto-populate timed out after %ds, returning partial data",
-                dashboard_id[:8], _AUTO_POPULATE_TIMEOUT,
+                dashboard_id[:8],
+                _AUTO_POPULATE_TIMEOUT,
             )
         except Exception as exc:
             logger.warning("Dashboard %s: auto-populate failed: %s", dashboard_id[:8], exc)
@@ -312,16 +314,16 @@ async def refresh_dashboard(
 
     All charts run simultaneously — total time ≈ slowest single chart.
     """
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
     from models.connection import SourceConfig
     from query_engine.engine import run_queries_parallel
     from storage import source_config_cache
+    from storage.orm.charts import ChartORM, DashboardChartORM, DashboardORM
     from storage.repositories import JobRepository
-    from sqlalchemy.orm import selectinload
-    from sqlalchemy import select
-    from storage.orm.charts import DashboardORM, DashboardChartORM, ChartORM
 
     # ── 1. Load dashboard + charts (with dataset SQL) ─────────────────────────
-    from sqlalchemy.orm import selectinload
     result = await db.execute(
         select(DashboardORM)
         .where(
@@ -353,7 +355,9 @@ async def refresh_dashboard(
                     cfg = SourceConfig(**raw)
                     source_config_cache.store(job_id, cfg, tenant_id=current_user.id)
                 except Exception as exc:
-                    logger.warning("refresh: could not reconstruct SourceConfig for job %s: %s", job_id, exc)
+                    logger.warning(
+                        "refresh: could not reconstruct SourceConfig for job %s: %s", job_id, exc
+                    )
         cfg_cache[job_id] = cfg
         return cfg
 
@@ -368,14 +372,14 @@ async def refresh_dashboard(
     # ── 3. Run all queries in parallel ────────────────────────────────────────
     # Build an in-memory snapshots dict so we don't need Redis to return data
     snapshots: dict[str, dict] = {}
-    cached_at = datetime.now(timezone.utc).isoformat()
+    cached_at = datetime.now(UTC).isoformat()
 
     if valid_charts:
         queries = [(cfg, sql) for _, cfg, sql in valid_charts]
         results = await run_queries_parallel(queries, max_workers=min(len(queries), 6))
 
         # ── 4. Build snapshots in-memory + best-effort Redis write ─────────
-        for (dc, _, _), res in zip(valid_charts, results):
+        for (dc, _, _), res in zip(valid_charts, results, strict=False):
             snap = {
                 "columns": res["columns"],
                 "rows": res["rows"],

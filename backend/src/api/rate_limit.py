@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from typing import TYPE_CHECKING
 
-from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from config import settings
+
+if TYPE_CHECKING:
+    from fastapi import Request
 
 logger = logging.getLogger(__name__)
 

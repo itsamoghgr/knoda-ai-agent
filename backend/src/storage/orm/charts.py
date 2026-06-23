@@ -14,9 +14,7 @@ class DatasetORM(Base):
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    tenant_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), nullable=False, index=True
-    )
+    tenant_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False, index=True)
     job_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
         sa.ForeignKey("jobs.id", ondelete="CASCADE"),
@@ -47,9 +45,7 @@ class ChartORM(Base):
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    tenant_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), nullable=False, index=True
-    )
+    tenant_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False, index=True)
     dataset_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
         sa.ForeignKey("datasets.id", ondelete="CASCADE"),
@@ -84,9 +80,7 @@ class DashboardORM(Base):
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    tenant_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), nullable=False, index=True
-    )
+    tenant_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False, index=True)
     name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
     description: Mapped[str] = mapped_column(sa.Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(
@@ -130,10 +124,6 @@ class DashboardChartORM(Base):
     dashboard: Mapped["DashboardORM"] = relationship(
         "DashboardORM", back_populates="dashboard_charts"
     )
-    chart: Mapped["ChartORM"] = relationship(
-        "ChartORM", back_populates="dashboard_charts"
-    )
+    chart: Mapped["ChartORM"] = relationship("ChartORM", back_populates="dashboard_charts")
 
-    __table_args__ = (
-        sa.UniqueConstraint("dashboard_id", "chart_id", name="uq_dashboard_chart"),
-    )
+    __table_args__ = (sa.UniqueConstraint("dashboard_id", "chart_id", name="uq_dashboard_chart"),)
