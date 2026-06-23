@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from storage.orm.charts import ChartORM, DashboardChartORM, DashboardORM, DatasetORM
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 # ---------------------------------------------------------------------------
 # Dataset
@@ -185,8 +187,26 @@ class DashboardRepository:
     def _dashboard_similarity(self, query: str, candidate_name: str) -> float:
         """Token-set Jaccard similarity between a query string and a dashboard name."""
         _STOP = {
-            "a", "an", "the", "for", "of", "and", "or", "to", "in", "on", "at",
-            "by", "with", "new", "create", "build", "make", "show", "me", "us",
+            "a",
+            "an",
+            "the",
+            "for",
+            "of",
+            "and",
+            "or",
+            "to",
+            "in",
+            "on",
+            "at",
+            "by",
+            "with",
+            "new",
+            "create",
+            "build",
+            "make",
+            "show",
+            "me",
+            "us",
         }
 
         def tokenize(s: str) -> set[str]:
@@ -208,13 +228,15 @@ class DashboardRepository:
         for d in dashboards:
             score = self._dashboard_similarity(query, d.name)
             if score >= threshold:
-                results.append({
-                    "id": d.id,
-                    "name": d.name,
-                    "description": d.description or "",
-                    "similarity_score": round(score, 3),
-                    "url": f"/dashboards/{d.id}",
-                })
+                results.append(
+                    {
+                        "id": d.id,
+                        "name": d.name,
+                        "description": d.description or "",
+                        "similarity_score": round(score, 3),
+                        "url": f"/dashboards/{d.id}",
+                    }
+                )
         results.sort(key=lambda x: x["similarity_score"], reverse=True)
         return results
 
@@ -235,9 +257,7 @@ class DashboardRepository:
                 DashboardORM.tenant_id == self._tenant_id,
             )
             .options(
-                selectinload(DashboardORM.dashboard_charts).selectinload(
-                    DashboardChartORM.chart
-                )
+                selectinload(DashboardORM.dashboard_charts).selectinload(DashboardChartORM.chart)
             )
         )
         return result.scalar_one_or_none()
@@ -298,14 +318,10 @@ class DashboardRepository:
         await self._db.commit()
         return True
 
-    async def update_layout(
-        self, dashboard_id: str, layout: list[dict]
-    ) -> None:
+    async def update_layout(self, dashboard_id: str, layout: list[dict]) -> None:
         """Bulk-update grid positions for all charts in a dashboard."""
         result = await self._db.execute(
-            select(DashboardChartORM).where(
-                DashboardChartORM.dashboard_id == dashboard_id
-            )
+            select(DashboardChartORM).where(DashboardChartORM.dashboard_id == dashboard_id)
         )
         existing = {dc.chart_id: dc for dc in result.scalars().all()}
         for item in layout:

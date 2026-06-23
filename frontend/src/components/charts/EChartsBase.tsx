@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * EChartsBase — single reusable ECharts wrapper for Knoda.ai
+ * EChartsBase — single reusable ECharts wrapper for Knoda AI
  *
  * Handles: initialization, theme application, resize observation,
  * dark mode switching, loading overlay, click event forwarding, cleanup.

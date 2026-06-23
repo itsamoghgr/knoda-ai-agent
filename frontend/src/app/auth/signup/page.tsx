@@ -73,9 +73,9 @@ export default function SignUpPage() {
       <div className="w-full max-w-sm space-y-8">
         <div className="text-center">
           <div className="flex justify-center mb-3">
-            <Image src="/knoda.svg" alt="Knoda.ai" width={48} height={48} />
+            <Image src="/knoda.svg" alt="Knoda AI" width={48} height={48} />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Knoda.ai</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Knoda AI</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Create your account
           </p>

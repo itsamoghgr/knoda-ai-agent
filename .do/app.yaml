@@ -4,7 +4,7 @@ region: nyc
 services:
   - name: api
     github:
-      repo: itsamoghgr/db-discovery-agent
+      repo: itsamoghgr/knoda-ai-agent
       branch: main
       deploy_on_push: true
     dockerfile_path: docker/Dockerfile.backend
@@ -58,7 +58,7 @@ services:
       # ── CORS — set to your Vercel URL ─────────────────────────────────────────
       - key: CORS_ORIGINS
         scope: RUN_TIME
-        value: '["https://your-app.vercel.app"]'
+        value: '["https://knoda-ai-agent.vercel.app","https://knoda.itsamoghgr.com"]'
 
       # ── Safety limits ─────────────────────────────────────────────────────────
       - key: MAX_ROWS_PER_QUERY

@@ -126,7 +126,7 @@ function Navbar() {
         <Link href="/" className="flex items-center gap-2.5">
           <KMark size={28} />
           <span className="text-lg font-bold tracking-tight" style={{ fontFamily: "var(--font-syne)" }}>
-            Knoda.ai
+            Knoda AI
           </span>
         </Link>
 
@@ -1003,7 +1003,7 @@ function Footer() {
           <div className="flex flex-col items-center md:items-start gap-1">
             <div className="flex items-center gap-2">
               <KMark size={20} />
-              <span className="font-bold text-sm" style={{ fontFamily: "var(--font-syne)" }}>Knoda.ai</span>
+              <span className="font-bold text-sm" style={{ fontFamily: "var(--font-syne)" }}>Knoda AI</span>
             </div>
             <p className="text-xs text-muted-foreground">The AI that knows your data.</p>
           </div>
@@ -1023,7 +1023,7 @@ function Footer() {
           </div>
         </div>
         <Separator className="my-6" />
-        <p className="text-center text-xs text-muted-foreground">© 2025 Knoda.ai. All rights reserved.</p>
+        <p className="text-center text-xs text-muted-foreground">© 2025 Knoda AI. All rights reserved.</p>
       </div>
     </footer>
   );

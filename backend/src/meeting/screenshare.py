@@ -16,7 +16,6 @@ import logging
 
 from playwright.async_api import async_playwright
 
-from config import settings
 from meeting.recall_client import BotCompletedError, RecallClient
 
 logger = logging.getLogger(__name__)

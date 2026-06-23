@@ -44,6 +44,7 @@ class TokenUsageRepository:
     async def list_calls(self, limit: int = 200) -> list[dict]:
         """Return individual token usage records, most recent first."""
         from sqlalchemy import desc
+
         result = await self._db.execute(
             select(TokenUsageORM)
             .where(TokenUsageORM.tenant_id == self._tenant_id)

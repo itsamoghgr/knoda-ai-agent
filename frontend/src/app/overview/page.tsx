@@ -333,7 +333,7 @@ export default function DashboardPage() {
       {/* What the agent does — shown when no databases */}
       {!jobsLoading && totalJobs === 0 && (
         <div className="rounded-xl border bg-card p-6">
-          <h2 className="text-sm font-semibold mb-4">What Knoda.ai does</h2>
+          <h2 className="text-sm font-semibold mb-4">What Knoda AI does</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {[
               { icon: Database,   title: "Schema discovery",      desc: "Automatically maps all tables, columns, types, and constraints." },

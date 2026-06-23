@@ -38,7 +38,9 @@ directly instead of requiring a separate agent.
 
 from __future__ import annotations
 
+import contextlib
 import logging
+from datetime import UTC
 from typing import Any
 
 from langchain_core.tools import tool
@@ -47,20 +49,17 @@ from langgraph.prebuilt import create_react_agent
 
 from agents.core import (
     AgentToolsContext,
-    tool_describe_table,
     tool_execute_sql,
     tool_get_dashboard_charts,
-    tool_get_relationships,
     tool_get_semantic_catalog,
     tool_list_databases,
-    tool_search_tables,
 )
 
 logger = logging.getLogger(__name__)
 
 
 SUPERVISOR_PROMPT = """\
-You are the Supervisor for Knoda.ai — an AI-native data intelligence platform.
+You are the Supervisor for Knoda AI — an AI-native data intelligence platform.
 
 ## Temporal context
 Current UTC time: {current_utc_time}
@@ -128,6 +127,20 @@ Steps:
 3. Call `reschedule_meeting(meeting_id, new_scheduled_time_str)`.
 4. Confirm the new time with a natural sentence.
 NEVER call `schedule_meeting_presentation` for a reschedule — always use this tool.
+
+### Chart and dashboard creation
+For ANY request to create, build, or generate charts or dashboards — always route to analyst:
+  ("create a dashboard", "build a revenue chart", "make a bar chart", "I want a dashboard",
+   "add a chart to a dashboard", "show this as a chart", "create a KPI", "build a table chart")
+  → Output ONLY: <route>analyst</route>
+  Never answer these yourself. The analyst_agent has all creation tools:
+  create_chart, create_dashboard, find_similar_dashboards, add_chart_to_dashboard.
+
+### Chart and dashboard listing/inspection
+For requests about existing charts or dashboards:
+  ("what charts do we have?", "list dashboards", "what's on the sales dashboard?")
+  → Output ONLY: <route>analyst</route>
+  Never answer these yourself.
 
 ## Routing signal
 After deciding, respond with one of these XML tags:
@@ -206,6 +219,7 @@ def build_supervisor(
             return '{"match": false, "reason": "No memory context available"}'
         try:
             from agents.core import tool_find_existing_dataset
+
             return await tool_find_existing_dataset(ctx, question)
         except (ImportError, AttributeError):
             return '{"match": false, "reason": "tool_find_existing_dataset not yet available"}'
@@ -256,10 +270,14 @@ def build_supervisor(
         """
         try:
             import base64
+
             from openai import AsyncOpenAI
+
             from config import settings
 
-            client = AsyncOpenAI(api_key=settings.openai_api_key if hasattr(settings, "openai_api_key") else "")
+            client = AsyncOpenAI(
+                api_key=settings.openai_api_key if hasattr(settings, "openai_api_key") else ""
+            )
             voice = getattr(settings, "tts_voice", "alloy")
             tts_model = getattr(settings, "tts_model", "tts-1")
 
@@ -298,7 +316,6 @@ def build_supervisor(
         import re
         import urllib.parse
         import uuid
-        from datetime import timezone
 
         import dateparser
 
@@ -336,7 +353,8 @@ def build_supervisor(
             )
 
         from datetime import datetime
-        if parsed_time <= datetime.now(tz=timezone.utc):
+
+        if parsed_time <= datetime.now(tz=UTC):
             return "The scheduled time appears to be in the past. Please provide a future time."
 
         # Validate dashboard_id is a proper UUID (not a name string)
@@ -401,7 +419,6 @@ def build_supervisor(
             return "Cannot reschedule: no context available."
 
         import dateparser
-        from datetime import timezone
 
         parsed_time = dateparser.parse(
             new_scheduled_time_str,
@@ -419,7 +436,8 @@ def build_supervisor(
             )
 
         from datetime import datetime
-        if parsed_time <= datetime.now(tz=timezone.utc):
+
+        if parsed_time <= datetime.now(tz=UTC):
             return "The new time appears to be in the past. Please provide a future time."
 
         try:
@@ -438,10 +456,8 @@ def build_supervisor(
             if orm is None:
                 return f"Meeting {meeting_id} not found or you don't have permission to update it."
 
-            try:
+            with contextlib.suppress(Exception):
                 cancel_meeting_job(meeting_id)
-            except Exception:
-                pass
             await schedule_meeting_job(
                 meeting_id=meeting_id,
                 meet_url=orm.meet_url,
@@ -469,17 +485,26 @@ def build_supervisor(
         if ctx is None:
             return '{"dashboards": [], "reason": "No context available"}'
         import json
+
         async with ctx.session_factory() as db:
             from storage.repositories.charts_repo import DashboardRepository
+
             repo = DashboardRepository(db, ctx.tenant_id)
             matches = await repo.find_similar(query, threshold=0.15)
             if not matches:
                 # Fallback: list all dashboards so agent can pick the closest
                 all_dashboards = await repo.list()
                 if not all_dashboards:
-                    return json.dumps({"dashboards": [], "reason": "No dashboards found for this account"})
+                    return json.dumps(
+                        {"dashboards": [], "reason": "No dashboards found for this account"}
+                    )
                 matches = [
-                    {"id": str(d.id), "name": d.name, "description": d.description or "", "similarity_score": 0.0}
+                    {
+                        "id": str(d.id),
+                        "name": d.name,
+                        "description": d.description or "",
+                        "similarity_score": 0.0,
+                    }
                     for d in all_dashboards[:10]
                 ]
         return json.dumps({"dashboards": matches})
@@ -497,6 +522,7 @@ def build_supervisor(
         if ctx is None:
             return '{"meetings": [], "reason": "No context available"}'
         import json
+
         try:
             from storage.repositories.meeting_repo import MeetingPresentationRepository
 
@@ -504,19 +530,21 @@ def build_supervisor(
                 repo = MeetingPresentationRepository(db, ctx.tenant_id)
                 meetings = await repo.list()
 
-            return json.dumps({
-                "meetings": [
-                    {
-                        "id": m.id,
-                        "dashboard_id": m.dashboard_id,
-                        "meet_url": m.meet_url,
-                        "scheduled_at": m.scheduled_at.isoformat() if m.scheduled_at else None,
-                        "status": m.status,
-                        "created_at": m.created_at.isoformat() if m.created_at else None,
-                    }
-                    for m in meetings
-                ]
-            })
+            return json.dumps(
+                {
+                    "meetings": [
+                        {
+                            "id": m.id,
+                            "dashboard_id": m.dashboard_id,
+                            "meet_url": m.meet_url,
+                            "scheduled_at": m.scheduled_at.isoformat() if m.scheduled_at else None,
+                            "status": m.status,
+                            "created_at": m.created_at.isoformat() if m.created_at else None,
+                        }
+                        for m in meetings
+                    ]
+                }
+            )
         except Exception as exc:
             logger.error("Failed to list meetings: %s", exc, exc_info=True)
             return json.dumps({"meetings": [], "error": str(exc)})
@@ -556,6 +584,7 @@ def build_supervisor(
         supervisor answered the question itself.
         """
         import re
+
         messages = state.get("messages", [])
 
         # Pass 1: scan ALL messages (newest-first) for routing signals
@@ -581,13 +610,14 @@ def build_supervisor(
 
         # Pass 2: no routing signal found — check for a direct answer
         for m in reversed(messages):
-            if hasattr(m, "content") and m.content:
-                if not hasattr(m, "tool_calls") or not m.tool_calls:
-                    content = m.content if isinstance(m.content, str) else str(m.content)
-                    if content.strip():
-                        logger.info("Supervisor routing: direct answer (no routing signal) → END")
-                        return END
-                    break
+            if (hasattr(m, "content") and m.content) and (
+                not hasattr(m, "tool_calls") or not m.tool_calls
+            ):
+                content = m.content if isinstance(m.content, str) else str(m.content)
+                if content.strip():
+                    logger.info("Supervisor routing: direct answer (no routing signal) → END")
+                    return END
+                break
 
         # Default: route to analyst (safest fallback for data questions)
         logger.info("Supervisor routing: no explicit signal found, defaulting to analyst_agent")

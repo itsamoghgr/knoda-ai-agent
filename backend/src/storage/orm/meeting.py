@@ -14,9 +14,7 @@ class MeetingPresentationORM(Base):
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    tenant_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), nullable=False, index=True
-    )
+    tenant_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False, index=True)
     dashboard_id: Mapped[str | None] = mapped_column(
         UUID(as_uuid=False),
         sa.ForeignKey("dashboards.id", ondelete="SET NULL"),

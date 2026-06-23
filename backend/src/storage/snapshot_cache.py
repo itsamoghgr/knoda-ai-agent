@@ -18,10 +18,11 @@ Circuit Breaker:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from storage.redis_client import get_redis
 
@@ -91,12 +92,10 @@ async def get_many(chart_ids: list[str]) -> dict[str, dict]:
         values = await get_redis().mget(*keys)
         _cb_reset()
         result: dict[str, dict] = {}
-        for chart_id, raw in zip(chart_ids, values):
+        for chart_id, raw in zip(chart_ids, values, strict=False):
             if raw:
-                try:
+                with contextlib.suppress(json.JSONDecodeError):
                     result[chart_id] = json.loads(raw)
-                except json.JSONDecodeError:
-                    pass
         return result
     except Exception as exc:
         _cb_trip()
@@ -118,7 +117,7 @@ async def set(  # noqa: A001 — shadowing builtin intentionally for clarity
             "columns": columns,
             "rows": rows,
             "row_count": len(rows),
-            "cached_at": cached_at or datetime.now(timezone.utc).isoformat(),
+            "cached_at": cached_at or datetime.now(UTC).isoformat(),
         },
         default=str,
     )

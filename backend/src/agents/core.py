@@ -11,10 +11,10 @@ import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from datetime import UTC
+from typing import TYPE_CHECKING, Any
 
 from models.relationship import Relationship, RelationshipSource
-from models.schema import TableMeta
 from models.semantic import (
     Dimension,
     DimensionType,
@@ -24,7 +24,12 @@ from models.semantic import (
     MeasureAgg,
     SemanticModel,
 )
-from query_engine.engine import QueryEngine
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from models.schema import TableMeta
+    from query_engine.engine import QueryEngine
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +41,6 @@ logger = logging.getLogger(__name__)
 
 def _build_embedding_text(model) -> str:
     """Build a rich plain-text representation of a SemanticModel for embedding."""
-    from models.semantic import SemanticModel  # avoid circular at module level
 
     parts = [f"Table: {model.schema_name}.{model.table_name}"]
     if model.description:
@@ -105,18 +109,22 @@ def build_llm(
 
     if llm_provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
+
         return ChatAnthropic(model=llm_model, api_key=llm_api_key, max_tokens=8096)
 
     elif llm_provider == "ollama":
         from langchain_community.chat_models import ChatOllama  # type: ignore[import]
+
         return ChatOllama(model=llm_model)
 
     elif llm_provider == "groq":
         from langchain_groq import ChatGroq
+
         return ChatGroq(model=llm_model, api_key=llm_api_key, temperature=0, max_tokens=8096)
 
     elif llm_provider == "featherless":
         from langchain_openai import ChatOpenAI
+
         return ChatOpenAI(
             model=llm_model,
             api_key=llm_api_key,
@@ -127,6 +135,7 @@ def build_llm(
 
     else:  # openai (default)
         from langchain_openai import ChatOpenAI
+
         return ChatOpenAI(
             model=llm_model,
             api_key=llm_api_key,
@@ -168,7 +177,9 @@ async def tool_explore_schema(ctx: AgentToolsContext, database_alias: str | None
     row estimate. Use this first to understand the full structure before
     calling describe_table on specific tables.
     """
-    from tools.schema import list_databases as _list_dbs, list_schemas as _list_schemas, list_tables as _list_tbls
+    from tools.schema import list_databases as _list_dbs
+    from tools.schema import list_schemas as _list_schemas
+    from tools.schema import list_tables as _list_tbls
 
     loop = asyncio.get_running_loop()
     ex = ctx.engine.executor  # shared single-worker executor — serial DuckDB access
@@ -326,8 +337,8 @@ async def tool_search_tables(ctx: AgentToolsContext, query: str) -> str:
     Returns the top matching tables with their types and descriptions.
     Always call this before writing SQL to find the right tables to use.
     """
-    from storage.repositories import EmbeddingRepository, SemanticRepository, SettingsRepository
     from embeddings.service import EmbeddingService
+    from storage.repositories import EmbeddingRepository, SemanticRepository, SettingsRepository
 
     alias = next(iter(ctx.alias_map.values()), "")
 
@@ -350,9 +361,15 @@ async def tool_search_tables(ctx: AgentToolsContext, query: str) -> str:
                 if matches:
                     lines = [f"Top {len(matches)} tables relevant to '{query}' (semantic search):"]
                     for m in matches:
-                        fqn = f"{alias}.{m.schema_name}.{m.table_name}" if alias else f"{m.schema_name}.{m.table_name}"
+                        fqn = (
+                            f"{alias}.{m.schema_name}.{m.table_name}"
+                            if alias
+                            else f"{m.schema_name}.{m.table_name}"
+                        )
                         lines.append(f"  {fqn}")
-                        lines.append(f"    {m.text_content.splitlines()[0] if m.text_content else ''}")
+                        lines.append(
+                            f"    {m.text_content.splitlines()[0] if m.text_content else ''}"
+                        )
                     return "\n".join(lines)
     except Exception as exc:
         logger.warning("Vector search failed, falling back to keyword search: %s", exc)
@@ -383,7 +400,11 @@ async def tool_search_tables(ctx: AgentToolsContext, query: str) -> str:
 
     lines = [f"Top {len(relevant[:15])} tables relevant to '{query}' (keyword search):"]
     for m in relevant[:15]:
-        fqn = f"{alias}.{m.schema_name}.{m.table_name}" if alias else f"{m.schema_name}.{m.table_name}"
+        fqn = (
+            f"{alias}.{m.schema_name}.{m.table_name}"
+            if alias
+            else f"{m.schema_name}.{m.table_name}"
+        )
         lines.append(f"  {fqn:<50} [{m.table_type}]  {m.description}")
     return "\n".join(lines)
 
@@ -408,9 +429,19 @@ async def tool_get_relationships(ctx: AgentToolsContext) -> str:
     alias = next(iter(ctx.alias_map.values()), "")
     lines = [f"Relationships ({len(rels)} total):"]
     for r in rels:
-        src = f"{alias}.{r.from_schema}.{r.from_table}.{r.from_column}" if alias else f"{r.from_table}.{r.from_column}"
-        tgt = f"{alias}.{r.to_schema}.{r.to_table}.{r.to_column}" if alias else f"{r.to_table}.{r.to_column}"
-        src_label = "FK" if r.source == RelationshipSource.EXPLICIT else f"inferred ({r.confidence:.0%})"
+        src = (
+            f"{alias}.{r.from_schema}.{r.from_table}.{r.from_column}"
+            if alias
+            else f"{r.from_table}.{r.from_column}"
+        )
+        tgt = (
+            f"{alias}.{r.to_schema}.{r.to_table}.{r.to_column}"
+            if alias
+            else f"{r.to_table}.{r.to_column}"
+        )
+        src_label = (
+            "FK" if r.source == RelationshipSource.EXPLICIT else f"inferred ({r.confidence:.0%})"
+        )
         lines.append(f"  {src}  →  {tgt}  ({src_label})")
     return "\n".join(lines)
 
@@ -450,18 +481,30 @@ async def tool_get_semantic_catalog(ctx: AgentToolsContext) -> str:
             rels = await RelationshipRepository(s).list_by_job(ctx.job_id)
         alias = next(iter(ctx.alias_map.values()), "")
         for r in rels:
-            src = f"{alias}.{r.from_schema}.{r.from_table}.{r.from_column}" if alias else f"{r.from_table}.{r.from_column}"
-            tgt = f"{alias}.{r.to_schema}.{r.to_table}.{r.to_column}" if alias else f"{r.to_table}.{r.to_column}"
-            label = "FK" if r.source == RelationshipSource.EXPLICIT else f"inferred ({r.confidence:.0%})"
+            src = (
+                f"{alias}.{r.from_schema}.{r.from_table}.{r.from_column}"
+                if alias
+                else f"{r.from_table}.{r.from_column}"
+            )
+            tgt = (
+                f"{alias}.{r.to_schema}.{r.to_table}.{r.to_column}"
+                if alias
+                else f"{r.to_table}.{r.to_column}"
+            )
+            label = (
+                "FK"
+                if r.source == RelationshipSource.EXPLICIT
+                else f"inferred ({r.confidence:.0%})"
+            )
             rel_lines.append(f"  {src}  →  {tgt}  ({label})")
     except Exception:
         pass
 
     alias = next(iter(ctx.alias_map.values()), "")
     facts = [m for m in models if m.table_type == "fact"]
-    dims  = [m for m in models if m.table_type == "dimension"]
+    dims = [m for m in models if m.table_type == "dimension"]
     bridges = [m for m in models if m.table_type == "bridge"]
-    others  = [m for m in models if m.table_type not in ("fact", "dimension", "bridge")]
+    others = [m for m in models if m.table_type not in ("fact", "dimension", "bridge")]
 
     lines = [
         f"Semantic Catalog — {len(models)} tables  |  "
@@ -471,7 +514,11 @@ async def tool_get_semantic_catalog(ctx: AgentToolsContext) -> str:
     ]
 
     def _format_model(m) -> list[str]:
-        fqn = f"{alias}.{m.schema_name}.{m.table_name}" if alias else f"{m.schema_name}.{m.table_name}"
+        fqn = (
+            f"{alias}.{m.schema_name}.{m.table_name}"
+            if alias
+            else f"{m.schema_name}.{m.table_name}"
+        )
         out = [f"[{m.table_type.upper()}] {fqn}"]
         if m.description:
             out.append(f"  Description : {m.description}")
@@ -485,7 +532,7 @@ async def tool_get_semantic_catalog(ctx: AgentToolsContext) -> str:
             out.append(f"  Foreign keys: {', '.join(fk_cols)}")
         if m.dimensions:
             dim_names = ", ".join(d.column_name for d in m.dimensions[:12])
-            suffix = f" (+{len(m.dimensions)-12} more)" if len(m.dimensions) > 12 else ""
+            suffix = f" (+{len(m.dimensions) - 12} more)" if len(m.dimensions) > 12 else ""
             out.append(f"  Dimensions  : {dim_names}{suffix}")
         if m.measures:
             meas_names = ", ".join(f"{ms.name} ({ms.agg})" for ms in m.measures[:8])
@@ -546,7 +593,9 @@ async def tool_save_classification(ctx: AgentToolsContext, table_fqn: str, model
         # Update job progress — each save commits independently
         try:
             async with ctx.session_factory() as s2:
-                await JobRepository(s2, ctx.tenant_id).update_progress(ctx.job_id, ctx.tables_total, ctx.tables_saved)
+                await JobRepository(s2, ctx.tenant_id).update_progress(
+                    ctx.job_id, ctx.tables_total, ctx.tables_saved
+                )
         except Exception as prog_exc:
             logger.debug("Progress update skipped: %s", prog_exc)
 
@@ -556,7 +605,9 @@ async def tool_save_classification(ctx: AgentToolsContext, table_fqn: str, model
             from storage.repositories import EmbeddingRepository, SettingsRepository
 
             async with ctx.session_factory() as s3:
-                api_key, emb_model = await SettingsRepository(s3, ctx.tenant_id).get_embedding_config()
+                api_key, emb_model = await SettingsRepository(
+                    s3, ctx.tenant_id
+                ).get_embedding_config()
 
             if api_key:
                 emb_text = _build_embedding_text(model)
@@ -572,13 +623,19 @@ async def tool_save_classification(ctx: AgentToolsContext, table_fqn: str, model
                             text_content=emb_text,
                             model=emb_model or "text-embedding-3-small",
                         )
-                    logger.debug("[Job %s] Embedded: %s.%s", ctx.job_id, model.schema_name, model.table_name)
+                    logger.debug(
+                        "[Job %s] Embedded: %s.%s", ctx.job_id, model.schema_name, model.table_name
+                    )
         except Exception as emb_exc:
             logger.warning("[Job %s] Embedding skipped for %s: %s", ctx.job_id, table_fqn, emb_exc)
 
         logger.info(
             "[Job %s] Saved classification: %s (%s) — %d/%d",
-            ctx.job_id, model.table_name, model.table_type, ctx.tables_saved, ctx.tables_total,
+            ctx.job_id,
+            model.table_name,
+            model.table_type,
+            ctx.tables_saved,
+            ctx.tables_total,
         )
         return (
             f"Saved: {model.table_name} [{model.table_type}] "
@@ -609,7 +666,11 @@ async def tool_save_relationships(ctx: AgentToolsContext, relationships_json: st
     from storage.repositories import RelationshipRepository
 
     try:
-        data = json.loads(relationships_json) if isinstance(relationships_json, str) else relationships_json
+        data = (
+            json.loads(relationships_json)
+            if isinstance(relationships_json, str)
+            else relationships_json
+        )
         if not isinstance(data, list):
             data = [data]
 
@@ -734,16 +795,20 @@ async def tool_create_chart(
 
     chart_type = chart_type.lower().strip()
     if chart_type not in VALID_CHART_TYPES:
-        return json.dumps({
-            "error": f"Invalid chart_type '{chart_type}'. Must be one of: {', '.join(sorted(VALID_CHART_TYPES))}"
-        })
+        return json.dumps(
+            {
+                "error": f"Invalid chart_type '{chart_type}'. Must be one of: {', '.join(sorted(VALID_CHART_TYPES))}"
+            }
+        )
 
     job_id = ctx.job_id
     if not job_id:
         # Global mode — pick first available job
         job_id = next(iter(ctx.alias_map.keys()), "")
     if not job_id:
-        return json.dumps({"error": "No database job context available. Please connect a database first."})
+        return json.dumps(
+            {"error": "No database job context available. Please connect a database first."}
+        )
 
     # Parse y_columns (comma-separated string or already a list)
     if isinstance(y_columns, str):
@@ -794,29 +859,36 @@ async def tool_create_chart(
 
         # ── Capture snapshot into Redis while DuckDB is already warm ─────────
         try:
-            from datetime import datetime, timezone
+            from datetime import datetime
+
             from storage import snapshot_cache
 
             loop = asyncio.get_running_loop()
             rows = await loop.run_in_executor(ctx.engine.executor, ctx.engine.execute_raw, sql)
             columns = list(rows[0].keys()) if rows else []
             await snapshot_cache.set(
-                chart.id, columns, rows,
-                cached_at=datetime.now(timezone.utc).isoformat(),
+                chart.id,
+                columns,
+                rows,
+                cached_at=datetime.now(UTC).isoformat(),
             )
-            logger.info("[Agent] Snapshot written to Redis for chart %s (%d rows)", chart.id, len(rows))
+            logger.info(
+                "[Agent] Snapshot written to Redis for chart %s (%d rows)", chart.id, len(rows)
+            )
         except Exception as snap_exc:
             logger.warning("[Agent] Snapshot skipped for chart %s: %s", chart.id, snap_exc)
         # ── End snapshot ──────────────────────────────────────────────────────
 
-        return json.dumps({
-            "chart_id": chart.id,
-            "chart_name": chart.name,
-            "dataset_id": dataset.id,
-            "chart_type": chart_type,
-            "url": f"/charts/{chart.id}",
-            "message": f"Chart '{name}' created successfully.",
-        })
+        return json.dumps(
+            {
+                "chart_id": chart.id,
+                "chart_name": chart.name,
+                "dataset_id": dataset.id,
+                "chart_type": chart_type,
+                "url": f"/charts/{chart.id}",
+                "message": f"Chart '{name}' created successfully.",
+            }
+        )
     except Exception as exc:
         logger.warning("[Agent] create_chart failed: %s", exc)
         return json.dumps({"error": str(exc)})
@@ -833,18 +905,20 @@ async def tool_list_charts(ctx: AgentToolsContext) -> str:
         if not charts:
             return json.dumps({"charts": [], "message": "No charts have been saved yet."})
 
-        return json.dumps({
-            "charts": [
-                {
-                    "id": c.id,
-                    "name": c.name,
-                    "chart_type": c.chart_type,
-                    "dataset_id": c.dataset_id,
-                    "url": f"/charts/{c.id}",
-                }
-                for c in charts
-            ]
-        })
+        return json.dumps(
+            {
+                "charts": [
+                    {
+                        "id": c.id,
+                        "name": c.name,
+                        "chart_type": c.chart_type,
+                        "dataset_id": c.dataset_id,
+                        "url": f"/charts/{c.id}",
+                    }
+                    for c in charts
+                ]
+            }
+        )
     except Exception as exc:
         logger.warning("[Agent] list_charts failed: %s", exc)
         return json.dumps({"error": str(exc)})
@@ -861,12 +935,14 @@ async def tool_list_dashboards(ctx: AgentToolsContext) -> str:
         if not dashboards:
             return json.dumps({"dashboards": [], "message": "No dashboards exist yet."})
 
-        return json.dumps({
-            "dashboards": [
-                {"id": d.id, "name": d.name, "description": d.description or ""}
-                for d in dashboards
-            ]
-        })
+        return json.dumps(
+            {
+                "dashboards": [
+                    {"id": d.id, "name": d.name, "description": d.description or ""}
+                    for d in dashboards
+                ]
+            }
+        )
     except Exception as exc:
         logger.warning("[Agent] list_dashboards failed: %s", exc)
         return json.dumps({"error": str(exc)})
@@ -878,21 +954,27 @@ async def tool_find_similar_dashboards(ctx: AgentToolsContext, query: str) -> st
 
     try:
         async with ctx.session_factory() as db:
-            matches = await DashboardRepository(db, ctx.tenant_id).find_similar(query, threshold=0.30)
+            matches = await DashboardRepository(db, ctx.tenant_id).find_similar(
+                query, threshold=0.30
+            )
 
         if not matches:
-            return json.dumps({
-                "similar_dashboards": [],
-                "message": "No similar dashboards found. Safe to create a new one.",
-            })
+            return json.dumps(
+                {
+                    "similar_dashboards": [],
+                    "message": "No similar dashboards found. Safe to create a new one.",
+                }
+            )
 
-        return json.dumps({
-            "similar_dashboards": matches,
-            "message": (
-                f"Found {len(matches)} existing dashboard(s) similar to your request. "
-                "Ask the user if they want to add to one of these or create a new one."
-            ),
-        })
+        return json.dumps(
+            {
+                "similar_dashboards": matches,
+                "message": (
+                    f"Found {len(matches)} existing dashboard(s) similar to your request. "
+                    "Ask the user if they want to add to one of these or create a new one."
+                ),
+            }
+        )
     except Exception as exc:
         logger.warning("[Agent] find_similar_dashboards failed: %s", exc)
         return json.dumps({"error": str(exc)})
@@ -918,12 +1000,14 @@ async def tool_get_dashboard_charts(ctx: AgentToolsContext, dashboard_id: str) -
             }
             for dc in (dashboard.dashboard_charts or [])
         ]
-        return json.dumps({
-            "dashboard_id": dashboard.id,
-            "dashboard_name": dashboard.name,
-            "chart_count": len(charts),
-            "charts": charts,
-        })
+        return json.dumps(
+            {
+                "dashboard_id": dashboard.id,
+                "dashboard_name": dashboard.name,
+                "chart_count": len(charts),
+                "charts": charts,
+            }
+        )
     except Exception as exc:
         logger.warning("[Agent] get_dashboard_charts failed: %s", exc)
         return json.dumps({"error": str(exc)})
@@ -946,25 +1030,29 @@ async def tool_create_dashboard(
             if not force:
                 matches = await repo.find_similar(name, threshold=0.30)
                 if matches:
-                    return json.dumps({
-                        "action_required": "confirm_or_reuse",
-                        "message": (
-                            "Similar dashboards already exist. Before creating a new one, "
-                            "ask the user: do they want to add charts to an existing dashboard, "
-                            "or create a separate new one?"
-                        ),
-                        "similar_dashboards": matches,
-                    })
+                    return json.dumps(
+                        {
+                            "action_required": "confirm_or_reuse",
+                            "message": (
+                                "Similar dashboards already exist. Before creating a new one, "
+                                "ask the user: do they want to add charts to an existing dashboard, "
+                                "or create a separate new one?"
+                            ),
+                            "similar_dashboards": matches,
+                        }
+                    )
 
             dashboard = await repo.create(name=name, description=description)
 
         logger.info("[Agent] Created dashboard '%s' (id=%s)", name, dashboard.id)
-        return json.dumps({
-            "dashboard_id": dashboard.id,
-            "dashboard_name": dashboard.name,
-            "url": f"/dashboards/{dashboard.id}",
-            "message": f"Dashboard '{name}' created successfully.",
-        })
+        return json.dumps(
+            {
+                "dashboard_id": dashboard.id,
+                "dashboard_name": dashboard.name,
+                "url": f"/dashboards/{dashboard.id}",
+                "message": f"Dashboard '{name}' created successfully.",
+            }
+        )
     except Exception as exc:
         logger.warning("[Agent] create_dashboard failed: %s", exc)
         return json.dumps({"error": str(exc)})
@@ -1042,12 +1130,14 @@ async def tool_add_chart_to_dashboard(
             )
 
         logger.info("[Agent] Added chart %s to dashboard %s", chart_id[:8], dashboard_id[:8])
-        return json.dumps({
-            "dashboard_id": dashboard_id,
-            "chart_id": chart_id,
-            "url": f"/dashboards/{dashboard_id}",
-            "message": f"Chart added to dashboard '{dashboard.name}' successfully.",
-        })
+        return json.dumps(
+            {
+                "dashboard_id": dashboard_id,
+                "chart_id": chart_id,
+                "url": f"/dashboards/{dashboard_id}",
+                "message": f"Chart added to dashboard '{dashboard.name}' successfully.",
+            }
+        )
     except Exception as exc:
         logger.warning("[Agent] add_chart_to_dashboard failed: %s", exc)
         return json.dumps({"error": str(exc)})
@@ -1088,7 +1178,9 @@ async def tool_find_existing_dataset(ctx: AgentToolsContext, question: str) -> s
         embedding_service = EmbeddingService(api_key=api_key)
         embedding = await embedding_service.embed(question)
         if not embedding:
-            return json.dumps({"match": False, "reason": "Could not generate embedding for question"})
+            return json.dumps(
+                {"match": False, "reason": "Could not generate embedding for question"}
+            )
 
         # Search long-term memory
         async with ctx.session_factory() as session:
@@ -1105,11 +1197,13 @@ async def tool_find_existing_dataset(ctx: AgentToolsContext, question: str) -> s
 
         # Threshold: only reuse if similarity is high enough (0.70+)
         if score < 0.70:
-            return json.dumps({
-                "match": False,
-                "reason": f"Best match score {score:.2f} below threshold (0.70)",
-                "closest": best.get("description", ""),
-            })
+            return json.dumps(
+                {
+                    "match": False,
+                    "reason": f"Best match score {score:.2f} below threshold (0.70)",
+                    "closest": best.get("description", ""),
+                }
+            )
 
         # Record the access to update popularity score
         async with ctx.session_factory() as session:
@@ -1118,18 +1212,19 @@ async def tool_find_existing_dataset(ctx: AgentToolsContext, question: str) -> s
             repo = LongTermMemoryRepository(session, ctx.tenant_id)
             await repo.record_access(best["id"])
 
-        return json.dumps({
-            "match": True,
-            "dataset_id": best["dataset_id"],
-            "description": best["description"],
-            "tables_used": best.get("tables_used", []),
-            "similarity_score": round(score, 3),
-            "times_accessed": best.get("times_accessed", 0),
-            "dataset_url": f"/datasets/{best['dataset_id']}",
-            "message": f"Found existing dataset with {score:.0%} similarity to your question.",
-        })
+        return json.dumps(
+            {
+                "match": True,
+                "dataset_id": best["dataset_id"],
+                "description": best["description"],
+                "tables_used": best.get("tables_used", []),
+                "similarity_score": round(score, 3),
+                "times_accessed": best.get("times_accessed", 0),
+                "dataset_url": f"/datasets/{best['dataset_id']}",
+                "message": f"Found existing dataset with {score:.0%} similarity to your question.",
+            }
+        )
 
     except Exception as exc:
         logger.warning("[Agent] tool_find_existing_dataset failed: %s", exc)
         return json.dumps({"match": False, "reason": f"Memory search error: {exc}"})
-

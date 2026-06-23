@@ -7,12 +7,12 @@ Two repositories:
 
 from __future__ import annotations
 
+import logging
 import uuid
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, text
 
 from storage.orm.long_term import (
     ConversationMessageORM,
@@ -21,7 +21,8 @@ from storage.orm.long_term import (
     DatasetIntentCardORM,
 )
 
-import logging
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,7 @@ class LongTermMemoryRepository:
             tables_used=tables_used,
             times_accessed=0,
             last_accessed=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._db.add(orm)
         await self._db.flush()  # get the id before the embedding update
@@ -225,16 +226,14 @@ class ConversationRepository:
             tool_calls=tool_calls,
             dataset_id=dataset_id,
             chart_id=chart_id,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._db.add(orm)
         await self._db.commit()
         await self._db.refresh(orm)
         return orm
 
-    async def list_sessions(
-        self, limit: int = 50
-    ) -> list[dict[str, Any]]:
+    async def list_sessions(self, limit: int = 50) -> list[dict[str, Any]]:
         """Return distinct sessions for this tenant, most recent first.
 
         Each entry includes: session_id, title (if set), last message preview,
@@ -263,9 +262,7 @@ class ConversationRepository:
             ORDER BY last_message_at DESC
             LIMIT :limit
         """)
-        result = await self._db.execute(
-            sql, {"tenant_id": self._tenant_id, "limit": limit}
-        )
+        result = await self._db.execute(sql, {"tenant_id": self._tenant_id, "limit": limit})
         rows = result.fetchall()
         return [
             {
@@ -282,13 +279,17 @@ class ConversationRepository:
         """Upsert a human-readable title for a session."""
         from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-        stmt = pg_insert(ConversationSessionTitleORM).values(
-            session_id=session_id,
-            tenant_id=self._tenant_id,
-            title=title,
-        ).on_conflict_do_update(
-            index_elements=["session_id"],
-            set_={"title": title},
+        stmt = (
+            pg_insert(ConversationSessionTitleORM)
+            .values(
+                session_id=session_id,
+                tenant_id=self._tenant_id,
+                title=title,
+            )
+            .on_conflict_do_update(
+                index_elements=["session_id"],
+                set_={"title": title},
+            )
         )
         await self._db.execute(stmt)
         await self._db.commit()
@@ -359,7 +360,7 @@ class ConversationRepository:
             tenant_id=self._tenant_id,
             session_id=session_id,
             summary=summary,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         self._db.add(orm)
         await self._db.commit()

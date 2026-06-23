@@ -1,5 +1,5 @@
 /**
- * ECharts theme configuration for Knoda.ai
+ * ECharts theme configuration for Knoda AI
  *
  * SERIES COLORS: Fixed 8-color accessible palette — identical in light and dark mode.
  * These never change. Multi-color charts always look great regardless of theme.

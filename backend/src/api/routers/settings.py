@@ -17,6 +17,7 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 # ─── Response / request models ────────────────────────────────────────────────
 
+
 class ProviderConfig(BaseModel):
     model: str | None = None
     api_key_set: bool = False
@@ -29,6 +30,7 @@ class AppSettingsResponse(BaseModel):
 
 class SaveProviderRequest(BaseModel):
     """Save (or update) configuration for one provider."""
+
     provider: str
     model: str
     api_key: str | None = None
@@ -36,6 +38,7 @@ class SaveProviderRequest(BaseModel):
 
 class ActivateProviderRequest(BaseModel):
     """Switch the active provider without touching its saved config."""
+
     provider: str
 
 
@@ -48,6 +51,7 @@ class TestLlmResponse(BaseModel):
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+
 async def _build_response(repo: SettingsRepository) -> AppSettingsResponse:
     active = await repo.get_active_provider()
     all_configs = await repo.get_all_provider_configs()
@@ -58,6 +62,7 @@ async def _build_response(repo: SettingsRepository) -> AppSettingsResponse:
 
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
+
 
 @router.get("", response_model=AppSettingsResponse)
 async def get_settings(
@@ -96,6 +101,7 @@ async def save_provider(
     # any in-flight streams that still hold the old API key/model in memory.
     if active == request.provider or not active:
         from api.routers.agent import abort_tenant_streams
+
         abort_tenant_streams(str(current_user.id))
 
     return await _build_response(repo)
@@ -122,6 +128,7 @@ async def activate_provider(
         )
     await repo.set_active_provider(request.provider)
     from api.routers.agent import abort_tenant_streams
+
     abort_tenant_streams(str(current_user.id))
     return await _build_response(repo)
 
@@ -144,6 +151,7 @@ async def test_llm_connection(
         start = time.monotonic()
         llm = _build_llm(provider, api_key or "", model)
         from langchain_core.messages import HumanMessage
+
         response = await llm.ainvoke([HumanMessage(content="Reply with exactly: ok")])
         latency_ms = int((time.monotonic() - start) * 1000)
         _ = response.content
@@ -156,22 +164,30 @@ async def test_llm_connection(
 def _build_llm(provider: str, api_key: str, model: str):  # type: ignore[return]
     if provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
+
         return ChatAnthropic(model=model, api_key=api_key, max_tokens=16)
     elif provider == "ollama":
         from langchain_community.chat_models import ChatOllama  # type: ignore[import]
+
         return ChatOllama(model=model)
     elif provider == "groq":
         from langchain_groq import ChatGroq
+
         return ChatGroq(model=model, api_key=api_key, temperature=0, max_tokens=16)
     elif provider == "featherless":
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(model=model, api_key=api_key, base_url="https://api.featherless.ai/v1", max_tokens=16)
+
+        return ChatOpenAI(
+            model=model, api_key=api_key, base_url="https://api.featherless.ai/v1", max_tokens=16
+        )
     else:
         from langchain_openai import ChatOpenAI
+
         return ChatOpenAI(model=model, api_key=api_key, max_tokens=16)
 
 
 # ─── Embedding config ──────────────────────────────────────────────────────────
+
 
 class EmbeddingSettingsResponse(BaseModel):
     api_key_set: bool
@@ -209,8 +225,10 @@ async def save_embedding_settings(
 
 # ─── Business context ───────────────────────────────────────────────────────────
 
+
 class BusinessContextFields(BaseModel):
     """Structured business context with one field per guided question."""
+
     company_description: str = ""
     business_model: str = ""
     fiscal_year_start: str = ""

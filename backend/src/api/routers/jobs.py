@@ -195,9 +195,7 @@ async def _run_discovery_job(
     """
     from storage import AsyncSessionFactory
     from storage.repositories import (
-        RelationshipRepository,
         SchemaRepository,
-        TokenUsageRepository,
     )
 
     async def _db(coro_fn):  # type: ignore[return]
@@ -214,30 +212,40 @@ async def _run_discovery_job(
         )
 
         if not db_provider or not db_model:
-            await _db(lambda s: JobRepository(s, tenant_id).update_status(
-                job_id, JobStatus.FAILED,
-                error_message="LLM is not configured. Go to Settings and select a provider and model.",
-            ))
+            await _db(
+                lambda s: JobRepository(s, tenant_id).update_status(
+                    job_id,
+                    JobStatus.FAILED,
+                    error_message="LLM is not configured. Go to Settings and select a provider and model.",
+                )
+            )
             return
 
         if not db_api_key and db_provider != "ollama":
-            await _db(lambda s: JobRepository(s, tenant_id).update_status(
-                job_id, JobStatus.FAILED,
-                error_message=f"No API key set for {db_provider}. Go to Settings and save your API key.",
-            ))
+            await _db(
+                lambda s: JobRepository(s, tenant_id).update_status(
+                    job_id,
+                    JobStatus.FAILED,
+                    error_message=f"No API key set for {db_provider}. Go to Settings and save your API key.",
+                )
+            )
             return
 
         llm = build_llm(provider=db_provider, api_key=db_api_key or "", model=db_model)
 
         # ── 2. Mark bootstrapping ─────────────────────────────────────────────
-        await _db(lambda s: JobRepository(s, tenant_id).update_status(job_id, JobStatus.BOOTSTRAPPING))
+        await _db(
+            lambda s: JobRepository(s, tenant_id).update_status(job_id, JobStatus.BOOTSTRAPPING)
+        )
 
-        await queue.put(ProgressEvent(
-            job_id=job_id,
-            phase="bootstrap",
-            message="Connecting to database…",
-            progress_pct=5,
-        ))
+        await queue.put(
+            ProgressEvent(
+                job_id=job_id,
+                phase="bootstrap",
+                message="Connecting to database…",
+                progress_pct=5,
+            )
+        )
 
         # ── 3. Build QueryEngine and attach source ────────────────────────────
         from query_engine.engine import QueryEngine
@@ -246,12 +254,14 @@ async def _run_discovery_job(
             alias = engine.attach(source_config)
             logger.info("[Job %s] Discovery agent attached source as alias '%s'", job_id, alias)
 
-            await queue.put(ProgressEvent(
-                job_id=job_id,
-                phase="bootstrap",
-                message=f"Connected — alias '{alias}'. Starting schema exploration…",
-                progress_pct=10,
-            ))
+            await queue.put(
+                ProgressEvent(
+                    job_id=job_id,
+                    phase="bootstrap",
+                    message=f"Connected — alias '{alias}'. Starting schema exploration…",
+                    progress_pct=10,
+                )
+            )
 
             # ── 4. Build AgentToolsContext — each tool uses its own short-lived session ──
             ctx = AgentToolsContext(
@@ -264,13 +274,17 @@ async def _run_discovery_job(
             # ── 5. Build and run discovery agent ──────────────────────────────
             discovery_agent, max_iterations = build_discovery_agent(llm, ctx)
 
-            await _db(lambda s: JobRepository(s, tenant_id).update_status(job_id, JobStatus.RUNNING))
-            await queue.put(ProgressEvent(
-                job_id=job_id,
-                phase="running",
-                message="Discovery agent started — exploring database schema…",
-                progress_pct=15,
-            ))
+            await _db(
+                lambda s: JobRepository(s, tenant_id).update_status(job_id, JobStatus.RUNNING)
+            )
+            await queue.put(
+                ProgressEvent(
+                    job_id=job_id,
+                    phase="running",
+                    message="Discovery agent started — exploring database schema…",
+                    progress_pct=15,
+                )
+            )
 
             discovery_message = (
                 f"Discover and catalog all tables in the database attached as alias '{alias}'. "
@@ -322,11 +336,13 @@ async def _run_discovery_job(
                                     meta = {
                                         "input_tokens": (
                                             raw_usage.get("input_tokens")
-                                            or raw_usage.get("prompt_tokens") or 0
+                                            or raw_usage.get("prompt_tokens")
+                                            or 0
                                         ),
                                         "output_tokens": (
                                             raw_usage.get("output_tokens")
-                                            or raw_usage.get("completion_tokens") or 0
+                                            or raw_usage.get("completion_tokens")
+                                            or 0
                                         ),
                                     }
                             if meta:
@@ -336,39 +352,42 @@ async def _run_discovery_job(
                         text = "".join(accumulated).strip()
                         accumulated.clear()
                         if text:
-                            await queue.put(ProgressEvent(
-                                job_id=job_id,
-                                phase="thinking",
-                                message=text,
-                                progress_pct=_calc_progress(ctx),
-                            ))
+                            await queue.put(
+                                ProgressEvent(
+                                    job_id=job_id,
+                                    phase="thinking",
+                                    message=text,
+                                    progress_pct=_calc_progress(ctx),
+                                )
+                            )
 
                     elif etype == "on_tool_start":
                         tool_name = ev.get("name", "tool")
                         raw_input = ev["data"].get("input", {})
                         if isinstance(raw_input, dict):
                             detail = (
-                                raw_input.get("table_fqn")
-                                or raw_input.get("database_alias")
-                                or ""
+                                raw_input.get("table_fqn") or raw_input.get("database_alias") or ""
                             )
                         else:
                             detail = str(raw_input)[:60]
                         msg = f"{tool_name}({detail})" if detail else f"{tool_name}()"
-                        await queue.put(ProgressEvent(
-                            job_id=job_id,
-                            phase="running",
-                            message=msg,
-                            progress_pct=_calc_progress(ctx),
-                            table_name=detail if "." in detail else None,
-                        ))
+                        await queue.put(
+                            ProgressEvent(
+                                job_id=job_id,
+                                phase="running",
+                                message=msg,
+                                progress_pct=_calc_progress(ctx),
+                                table_name=detail if "." in detail else None,
+                            )
+                        )
 
             except Exception as agent_exc:
                 logger.warning("[Job %s] Discovery agent loop ended: %s", job_id, agent_exc)
                 if ctx.tables_saved > 0:
                     logger.info(
                         "[Job %s] Partial success — %d tables classified",
-                        job_id, ctx.tables_saved,
+                        job_id,
+                        ctx.tables_saved,
                     )
                 else:
                     raise
@@ -395,7 +414,10 @@ async def _run_discovery_job(
                         except Exception as desc_exc:
                             logger.debug(
                                 "[Job %s] Could not fetch columns for %s.%s: %s",
-                                job_id, table_meta.schema_name, table_meta.table_name, desc_exc,
+                                job_id,
+                                table_meta.schema_name,
+                                table_meta.table_name,
+                                desc_exc,
                             )
 
                     async with AsyncSessionFactory() as s2:
@@ -446,22 +468,29 @@ async def _run_discovery_job(
 
         await _db(_finalize)
 
-        await queue.put(ProgressEvent(
-            job_id=job_id,
-            phase="done",
-            message=(
-                f"Discovery complete — {len(ctx.semantic_models_saved)} tables cataloged, "
-                f"{len(ctx.relationships_saved)} relationships found."
-            ),
-            progress_pct=100,
-        ))
+        await queue.put(
+            ProgressEvent(
+                job_id=job_id,
+                phase="done",
+                message=(
+                    f"Discovery complete — {len(ctx.semantic_models_saved)} tables cataloged, "
+                    f"{len(ctx.relationships_saved)} relationships found."
+                ),
+                progress_pct=100,
+            )
+        )
 
     except Exception as exc:
         logger.exception("[Job %s] Unhandled error in discovery background task", job_id)
+        error_message = str(exc)
         try:
-            await _db(lambda s: JobRepository(s, tenant_id).update_status(
-                job_id, JobStatus.FAILED, error_message=str(exc),
-            ))
+            await _db(
+                lambda s: JobRepository(s, tenant_id).update_status(
+                    job_id,
+                    JobStatus.FAILED,
+                    error_message=error_message,
+                )
+            )
         except Exception:
             logger.exception("[Job %s] Could not write FAILED status", job_id)
 

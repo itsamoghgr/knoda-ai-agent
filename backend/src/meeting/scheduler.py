@@ -10,11 +10,14 @@ Run the API server with --workers 1 when the meeting feature is enabled.
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from typing import TYPE_CHECKING
 
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
+
+if TYPE_CHECKING:
+    from datetime import datetime
 
 logger = logging.getLogger(__name__)
 

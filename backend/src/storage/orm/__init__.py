@@ -1,5 +1,4 @@
 from storage.orm.charts import ChartORM, DashboardChartORM, DashboardORM, DatasetORM
-from storage.orm.meeting import MeetingPresentationORM  # noqa: F401
 from storage.orm.embedding import TableEmbeddingORM
 from storage.orm.job import JobORM
 from storage.orm.long_term import (
@@ -8,6 +7,7 @@ from storage.orm.long_term import (
     ConversationSummaryORM,
     DatasetIntentCardORM,
 )
+from storage.orm.meeting import MeetingPresentationORM  # noqa: F401
 from storage.orm.profile import ColumnProfileORM, ProfileResultORM
 from storage.orm.relationship import RelationshipORM
 from storage.orm.schema import ColumnMetaORM, TableMetaORM

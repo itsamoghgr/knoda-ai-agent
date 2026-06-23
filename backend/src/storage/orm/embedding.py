@@ -9,6 +9,7 @@ from storage.database import Base
 
 try:
     from pgvector.sqlalchemy import Vector
+
     _VECTOR_TYPE = Vector(1536)
 except ImportError:  # pgvector not installed — column becomes Text fallback
     _VECTOR_TYPE = sa.Text()
@@ -20,9 +21,7 @@ class TableEmbeddingORM(Base):
     id: Mapped[str] = mapped_column(
         UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid.uuid4())
     )
-    tenant_id: Mapped[str] = mapped_column(
-        UUID(as_uuid=False), nullable=False, index=True
-    )
+    tenant_id: Mapped[str] = mapped_column(UUID(as_uuid=False), nullable=False, index=True)
     job_id: Mapped[str] = mapped_column(
         UUID(as_uuid=False),
         sa.ForeignKey("jobs.id", ondelete="CASCADE"),

@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 _INACTIVITY_TIMEOUT = 1800  # 30 minutes
 
 # Registry so the webhook handler can look up active sessions by bot_id
-_active_sessions: dict[str, "ActiveSession"] = {}
+_active_sessions: dict[str, ActiveSession] = {}
 
 
 class ActiveSession:
@@ -90,9 +90,7 @@ async def run_meeting(
             logger.error("Meeting %s failed: %s", meeting_id, exc, exc_info=True)
             async with AsyncSessionFactory() as db:
                 repo = MeetingPresentationRepository(db, tenant_id)
-                await repo.update_status(
-                    meeting_id, "failed", error_message=str(exc)
-                )
+                await repo.update_status(meeting_id, "failed", error_message=str(exc))
 
 
 async def _run_meeting_inner(
@@ -104,10 +102,7 @@ async def _run_meeting_inner(
 ) -> None:
     # Webhook URL must be publicly reachable — use FRONTEND_BASE_URL's origin
     # but point at the API backend. In local dev, use a tunnel (e.g. ngrok).
-    webhook_url = (
-        f"{settings.frontend_base_url.rstrip('/')}"
-        f"/api/v1/meetings/webhook/transcript"
-    )
+    webhook_url = f"{settings.frontend_base_url.rstrip('/')}/api/v1/meetings/webhook/transcript"
     # Note: Recall.ai calls the webhook on the backend, not the frontend.
     # The line above is intentionally using FRONTEND_BASE_URL as a convenience
     # for environments where frontend and API share the same public hostname.
@@ -128,9 +123,7 @@ async def _run_meeting_inner(
 
     async with AsyncSessionFactory() as db:
         repo = MeetingPresentationRepository(db, tenant_id)
-        await repo.update_status(
-            meeting_id, "running", present_session_id=present_session_id
-        )
+        await repo.update_status(meeting_id, "running", present_session_id=present_session_id)
 
     stop_event = asyncio.Event()
     session = ActiveSession(
@@ -144,10 +137,7 @@ async def _run_meeting_inner(
     _active_sessions[bot_id] = session
 
     try:
-        dashboard_url = (
-            f"{settings.frontend_base_url.rstrip('/')}"
-            f"/dashboards/{dashboard_id}?bot=1"
-        )
+        dashboard_url = f"{settings.frontend_base_url.rstrip('/')}/dashboards/{dashboard_id}?bot=1"
 
         # Wait for the bot to be in_call before starting screenshare/narration
         await _wait_for_bot_in_call(bot_id, recall)
@@ -159,7 +149,11 @@ async def _run_meeting_inner(
         async with asyncio.TaskGroup() as tg:
             tg.create_task(
                 run_screenshare_loop(
-                    dashboard_url, bot_id, recall, stop_event, dashboard_ready,
+                    dashboard_url,
+                    bot_id,
+                    recall,
+                    stop_event,
+                    dashboard_ready,
                     present_session_id=present_session_id,
                 ),
                 name="screenshare",
@@ -245,7 +239,7 @@ def _mp3_duration(mp3_bytes: bytes) -> float:
         while i < len(mp3_bytes) - 4:
             if mp3_bytes[i] == 0xFF and (mp3_bytes[i + 1] & 0xE0) == 0xE0:
                 # Parse MPEG frame header (4 bytes)
-                header = int.from_bytes(mp3_bytes[i:i + 4], "big")
+                header = int.from_bytes(mp3_bytes[i : i + 4], "big")
                 # Bitrate index (bits 15-12)
                 bitrate_index = (header >> 12) & 0xF
                 # MPEG layer (bits 17-16): 01=Layer3, 10=Layer2, 11=Layer1
@@ -254,7 +248,24 @@ def _mp3_duration(mp3_bytes: bytes) -> float:
                 version = (header >> 19) & 0x3
 
                 # Bitrate table for MPEG1 Layer3 (most common for TTS output), kbps
-                _BITRATES_MPEG1_L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0]
+                _BITRATES_MPEG1_L3 = [
+                    0,
+                    32,
+                    40,
+                    48,
+                    56,
+                    64,
+                    80,
+                    96,
+                    112,
+                    128,
+                    160,
+                    192,
+                    224,
+                    256,
+                    320,
+                    0,
+                ]
                 if version == 3 and layer == 1 and 0 < bitrate_index < 15:
                     kbps = _BITRATES_MPEG1_L3[bitrate_index]
                     if kbps > 0:
@@ -279,7 +290,7 @@ def _split_into_chunks(text: str, max_chars: int = 500) -> list[str]:
 
     chunks: list[str] = []
     remaining = text.strip()
-    sentence_end = re.compile(r'(?<=[.!?])\s+')
+    sentence_end = re.compile(r"(?<=[.!?])\s+")
 
     while len(remaining) > max_chars:
         # Find the last sentence boundary within max_chars
@@ -366,13 +377,16 @@ async def answer_and_play(session: ActiveSession, message: str) -> None:
 
 async def _stream_agent_sentences(session: ActiveSession, message: str):
     """Call the Communication Agent SSE stream and yield complete sentences."""
-    import json
 
     from langchain_core.messages import AIMessage, HumanMessage
 
     from agents.communication import build_communication_agent
     from agents.core import AgentToolsContext, build_llm
-    from api.routers.present import MAX_HISTORY_EXCHANGES, PresentationSession, _load_session, _save_session
+    from api.routers.present import (
+        MAX_HISTORY_EXCHANGES,
+        _load_session,
+        _save_session,
+    )
     from models.connection import SourceConfig
     from query_engine.engine import QueryEngine
     from storage import source_config_cache
@@ -401,11 +415,13 @@ async def _stream_agent_sentences(session: ActiveSession, message: str):
         all_cached = source_config_cache.all_configs()
         prefix = f"{session.tenant_id}:"
         job_configs: dict[str, SourceConfig] = {
-            k[len(prefix):]: v for k, v in all_cached.items() if k.startswith(prefix)
+            k[len(prefix) :]: v for k, v in all_cached.items() if k.startswith(prefix)
         }
         if not job_configs:
             async with AsyncSessionFactory() as jr_session:
-                raw_configs = await JobRepository(jr_session, session.tenant_id).list_all_source_configs()
+                raw_configs = await JobRepository(
+                    jr_session, session.tenant_id
+                ).list_all_source_configs()
             for jid, raw in raw_configs.items():
                 try:
                     cfg = SourceConfig(**raw)
@@ -440,7 +456,9 @@ async def _stream_agent_sentences(session: ActiveSession, message: str):
             elif h["role"] == "assistant" and h.get("content"):
                 lc_messages.append(AIMessage(content=h["content"]))
 
-        effective_message = message.strip() or "Please begin your presentation of this dashboard now."
+        effective_message = (
+            message.strip() or "Please begin your presentation of this dashboard now."
+        )
         lc_messages.append(HumanMessage(content=effective_message))
 
         sentence_buf = ""
@@ -459,7 +477,9 @@ async def _stream_agent_sentences(session: ActiveSession, message: str):
             content = chunk.content if hasattr(chunk, "content") else ""
             if isinstance(content, list):
                 content = "".join(
-                    b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"
+                    b.get("text", "")
+                    for b in content
+                    if isinstance(b, dict) and b.get("type") == "text"
                 )
             if not isinstance(content, str) or not content:
                 continue
@@ -473,7 +493,7 @@ async def _stream_agent_sentences(session: ActiveSession, message: str):
                     idx = sentence_buf.find(delimiter)
                     if idx != -1:
                         sentence = sentence_buf[: idx + 1].strip()
-                        sentence_buf = sentence_buf[idx + 1:]
+                        sentence_buf = sentence_buf[idx + 1 :]
                         if sentence:
                             yield sentence
                         break
@@ -507,6 +527,7 @@ async def _tts(text: str, tenant_id: str) -> bytes:
     Raises ValueError with a clear message if no OpenAI key is available.
     """
     from openai import AsyncOpenAI
+
     from storage.repositories.settings_repo import SettingsRepository
 
     async with AsyncSessionFactory() as db:

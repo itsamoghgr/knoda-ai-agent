@@ -29,14 +29,14 @@ from agents.core import (
     tool_get_relationships,
     tool_get_semantic_catalog,
     tool_list_charts,
-    tool_list_databases,
     tool_list_dashboards,
+    tool_list_databases,
     tool_search_tables,
 )
 
 logger = logging.getLogger(__name__)
 
-ANALYST_PROMPT = """You are an expert data analyst agent for Knoda.ai. You have access to a
+ANALYST_PROMPT = """You are an expert data analyst agent for Knoda AI. You have access to a
 pre-built semantic catalog produced by a discovery agent, plus the ability to query live databases.
 
 ## Core principle: semantic catalog first, live database last

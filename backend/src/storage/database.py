@@ -12,8 +12,8 @@ class Base(DeclarativeBase):
 
 engine = create_async_engine(
     settings.database_url,
-    pool_size=4,        # persistent connections through Supavisor transaction pooler
-    max_overflow=2,     # burst headroom; total max = 6
+    pool_size=4,  # persistent connections through Supavisor transaction pooler
+    max_overflow=2,  # burst headroom; total max = 6
     pool_pre_ping=True,
     echo=False,
     # Required for PgBouncer/Supavisor transaction mode — prepared statements are

@@ -9,10 +9,7 @@ def build_attach_sql(config: SourceConfig, alias: str) -> str:
     # URL-encode username and password so special characters (@ # $ / % etc.) don't break the URI
     username = quote(config.username or "", safe="")
     password = quote(password, safe="")
-    dsn = (
-        f"mysql://{username}:{password}"
-        f"@{config.host}:{config.port or 3306}/{config.database}"
-    )
+    dsn = f"mysql://{username}:{password}@{config.host}:{config.port or 3306}/{config.database}"
     return f"ATTACH '{dsn}' AS {alias} (TYPE mysql, READ_ONLY)"
 
 

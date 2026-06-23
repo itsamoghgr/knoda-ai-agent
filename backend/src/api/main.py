@@ -14,22 +14,20 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request as StarletteRequest
 
 from api.rate_limit import limiter
-
 from api.routers import agent as agent_router
 from api.routers import catalog, jobs, semantic
-from api.routers import conversations as conversations_router
-from api.routers import settings as settings_router
-from api.routers import usage as usage_router
-from api.routers import sql_lab as sql_lab_router
-from api.routers import datasets as datasets_router
 from api.routers import charts as charts_router
+from api.routers import conversations as conversations_router
 from api.routers import dashboards as dashboards_router
-from api.routers import present as present_router
+from api.routers import datasets as datasets_router
 from api.routers import meetings as meetings_router
+from api.routers import present as present_router
+from api.routers import settings as settings_router
+from api.routers import sql_lab as sql_lab_router
+from api.routers import usage as usage_router
 from config import settings
 from meeting.scheduler import start_scheduler, stop_scheduler
 from storage.database import AsyncSessionFactory, engine
-from storage.redis_client import close_redis
 from storage.orm import (  # noqa: F401 — registers all ORM models with Base
     AppSettingORM,
     ChartORM,
@@ -46,14 +44,15 @@ from storage.orm import (  # noqa: F401 — registers all ORM models with Base
     EntityORM,
     JobORM,
     MeasureORM,
+    MeetingPresentationORM,
     ProfileResultORM,
     RelationshipORM,
     SemanticModelORM,
     SemanticSnapshotORM,
     TableMetaORM,
     TokenUsageORM,
-    MeetingPresentationORM,
 )
+from storage.redis_client import close_redis
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -73,7 +72,7 @@ async def _cleanup_orphaned_meetings() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("Starting Knoda.ai API")
+    logger.info("Starting Knoda AI API")
     await _cleanup_orphaned_meetings()
     cleanup_task = present_router.start_session_cleanup()
     db_url = settings.apscheduler_database_url or settings.database_url
@@ -85,7 +84,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await cleanup_task
     await close_redis()
     await engine.dispose()
-    logger.info("Knoda.ai API stopped")
+    logger.info("Knoda AI API stopped")
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -103,7 +102,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Knoda.ai",
+        title="Knoda AI",
         description="LLM-powered database discovery and semantic layer generation API",
         version="0.1.0",
         lifespan=lifespan,
@@ -123,7 +122,13 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With", "X-Bot-Session"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "Accept",
+            "X-Requested-With",
+            "X-Bot-Session",
+        ],
     )
 
     api_prefix = "/api/v1"
